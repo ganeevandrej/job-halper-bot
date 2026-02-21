@@ -1,15 +1,9 @@
 import axios from "axios";
-import { resumes, coverLetterTemplate } from "../constants";
+import { resumes, coverLetterTemplate } from "../../constants";
+import { AIResult } from "./types";
+import { createBody } from "./utils";
 
-const OLLAMA_URL = "http://localhost:11434/api/generate";
-
-export interface AIResult {
-    matchPercent: number;
-    recommendation: string;
-    salaryAdvice: string;
-    coverLetter: string;
-    resumeChoice: string;
-}
+const OLLAMA_API_ENDPOINT = `${process.env.OLLAMA_URL}/api/generate`;
 
 export async function analyzeVacancyOllama(
     vacancyText: string
@@ -66,12 +60,7 @@ ${resumes[1].projects.map((p, i) => `
 }
 `;
 
-    const response = await axios.post(OLLAMA_URL, {
-        model: "llama3:8b",
-        prompt,
-        stream: false
-    });
-
+    const response = await axios.post(OLLAMA_API_ENDPOINT, createBody(prompt));
     const text = response.data.response;
 
     try {

@@ -1,16 +1,17 @@
 import TelegramBot from 'node-telegram-bot-api';
 import dotenv from 'dotenv';
 import { TEXT_VACANCY, TEXT_USE_COMMAND, TEXT_ANALYZING, TEXT_ERROR_ENV } from './constants';
-import { analyzeVacancyOllama } from './services/ollamaService';
-import { userTokens } from './services/authStorage';
+import { analyzeVacancyOllama } from './services/ollamaService/ollamaService';
+import { userTokens } from './services/authStorage/authStorage';
 
 dotenv.config();
 
-const token = process.env.BOT_TOKEN;
+const token = process.env.TELEGRAM_TOKEN;
 
 if (!token) {
   throw new Error(TEXT_ERROR_ENV);
 }
+
 export const bot = new TelegramBot(token, { polling: true });
 
 const waitingForVacancy = new Set<number>();
