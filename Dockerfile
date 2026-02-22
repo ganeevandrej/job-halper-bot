@@ -35,7 +35,11 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/package.json /app/pnpm-lock.yaml ./
 
 # 3. Устанавливаем только рабочие библиотеки (без devDependencies)
-RUN pnpm install --prod --frozen-lockfile && pnpm cache clean --force
+# RUN pnpm install --prod --frozen-lockfile && pnpm cache clean --force
+
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./
 
 # Указываем переменную окружения по умолчанию (можно переопределить в docker-compose)
 ENV NODE_ENV=production

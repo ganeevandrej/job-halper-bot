@@ -12,7 +12,7 @@ if (!token) {
   throw new Error(TEXT_ERROR_ENV);
 }
 
-export const bot = new TelegramBot(token, { polling: true });
+export const bot = new TelegramBot(token, { polling: false });
 
 const waitingForVacancy = new Set<number>();
 

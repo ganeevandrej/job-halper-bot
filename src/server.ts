@@ -1,11 +1,18 @@
 import express, { Request, Response } from 'express';
-// import { bot } from './bot';
+import { bot } from './bot';
 
 const app = express();
 
 export const PORT = process.env.APP_PORT || 3000;
 
-app.listen(PORT, () => console.log("Hi"));
+app.listen(PORT, async () => {
+    try {
+        await bot.startPolling();
+        console.log("Бот успешно запущен в режиме Polling");
+    } catch (err) {
+        console.error("Ошибка старта бота:", err);
+    }
+});
 
 app.get('/job-helper-bot', async (req: Request, res: Response) => {
     const code = req.query.code as string;
