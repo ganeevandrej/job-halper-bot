@@ -6,7 +6,7 @@ stages:
   - build
 
 build_job:
-  stage: 
+  stage: build
   only:
     - master
   script:
