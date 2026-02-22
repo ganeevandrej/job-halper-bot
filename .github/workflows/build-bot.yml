@@ -24,4 +24,4 @@ jobs:
           context: .
           push: true
           # Убедись, что путь к репозиторию верный
-          tags: ://registry.gitlab.com/ganeevandrej/job-halper-bot:latest
+          tags: registry.gitlab.com/ganeevandrej/job-halper-bot:latest
