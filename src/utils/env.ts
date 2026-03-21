@@ -21,4 +21,8 @@ export const env = {
   groqBaseUrl: "https://api.groq.com/openai/v1",
   groqModel: process.env.GROQ_MODEL || "llama-3.3-70b-versatile",
   parserHeadless: process.env.PLAYWRIGHT_HEADLESS === "true",
+  telegramDigestChatId: process.env.TELEGRAM_DIGEST_CHAT_ID || "",
+  digestCron: process.env.DIGEST_CRON || "0 9 * * *",
+  digestTimezone: process.env.DIGEST_TIMEZONE || "Europe/Moscow",
+  sqliteFilePath: process.env.SQLITE_FILE_PATH || "./data/job-helper.sqlite",
 };

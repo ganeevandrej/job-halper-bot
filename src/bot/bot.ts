@@ -1,4 +1,10 @@
-import { Bot, Context } from "grammy";
+import { Bot, Context, InlineKeyboard } from "grammy";
+import {
+  ANALYZE_FIRST_CALLBACK,
+  analyzeFirstQueuedVacancy,
+  buildSearchQueueMessage,
+  collectSearchQueue,
+} from "../digest/searchQueue";
 import { analyzeVacancy } from "../llm/groqClient";
 import { parseHhVacancy } from "../parser/hhParser";
 import { VacancyAnalysis, VacancyDetails } from "../types";
@@ -34,6 +40,24 @@ const sendFormattedResponse = async (ctx: Context, text: string) => {
   }
 };
 
+const sendHtmlResponse = async (
+  ctx: Context,
+  text: string,
+  replyMarkup?: InlineKeyboard,
+) => {
+  const chunks = splitTelegramMessage(text);
+
+  for (let index = 0; index < chunks.length; index += 1) {
+    await ctx.reply(chunks[index], {
+      parse_mode: "HTML",
+      reply_markup: index === chunks.length - 1 ? replyMarkup : undefined,
+      link_preview_options: {
+        is_disabled: true,
+      },
+    });
+  }
+};
+
 const processVacancy = async (
   ctx: Context,
   url: string,
@@ -57,6 +81,38 @@ export const createBot = (): Bot => {
         is_disabled: true,
       },
     });
+  });
+
+  bot.command("search", async (ctx) => {
+    await ctx.reply("Ищу новые вакансии по сохраненным поискам...");
+
+    try {
+      const { savedCount, queuedCount } = await collectSearchQueue();
+      const result = buildSearchQueueMessage(savedCount, queuedCount);
+      await ctx.reply(result.text, {
+        reply_markup: result.replyMarkup,
+        link_preview_options: {
+          is_disabled: true,
+        },
+      });
+    } catch (error) {
+      logger.error("Manual search failed", error);
+      await ctx.reply("Не удалось собрать список вакансий.");
+    }
+  });
+
+  bot.callbackQuery(ANALYZE_FIRST_CALLBACK, async (ctx) => {
+    await ctx.answerCallbackQuery({
+      text: "Анализирую первую вакансию...",
+    });
+
+    try {
+      const result = await analyzeFirstQueuedVacancy();
+      await sendHtmlResponse(ctx, result.text, result.replyMarkup);
+    } catch (error) {
+      logger.error("Analyze first vacancy callback failed", error);
+      await ctx.reply("Не удалось проанализировать первую вакансию.");
+    }
   });
 
   bot.on("message:text", async (ctx) => {

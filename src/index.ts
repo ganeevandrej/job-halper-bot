@@ -1,8 +1,10 @@
 import { createBot } from "./bot/bot";
+import { startDailyDigestScheduler } from "./digest/scheduler";
 import { logger } from "./utils/logger";
 
 const bootstrap = async (): Promise<void> => {
   const bot = createBot();
+  startDailyDigestScheduler(bot);
   await bot.start({
     onStart: () => logger.info("Telegram bot started"),
   });

@@ -18,6 +18,7 @@ export const formatVacancyAnalysis = (
     escapeHtml(vacancy.title),
     `Компания: ${escapeHtml(vacancy.company)}`,
     `ЗП: ${escapeHtml(vacancy.salary)}`,
+    `Ссылка: ${escapeHtml(vacancy.url)}`,
     "",
     "<b>=== АНАЛИЗ ===</b>",
     `Match: ${analysis.match_percent}%`,

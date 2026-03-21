@@ -14,3 +14,13 @@ export const isHhVacancyUrl = (value: string): boolean => {
     return false;
   }
 };
+
+export const extractHhVacancyId = (value: string): string | null => {
+  try {
+    const url = new URL(value.trim());
+    const match = url.pathname.match(/\/vacancy\/(\d+)/);
+    return match?.[1] || null;
+  } catch {
+    return null;
+  }
+};
