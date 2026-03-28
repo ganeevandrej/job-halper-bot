@@ -1,6 +1,11 @@
 import { InlineKeyboard } from "grammy";
+import {
+  API_SEARCH_CONFIGS,
+  buildHhSearchUrlFromApiConfig,
+} from "../config/apiSearchConfigs";
 import { SEARCH_URLS } from "../config/searchUrls";
 import { analyzeVacancy } from "../llm/groqClient";
+import { fetchVacanciesFromApi } from "../parser/hhApiClient";
 import { parseHhVacancy } from "../parser/hhParser";
 import { parseHhSearchResults } from "../parser/hhSearchParser";
 import {
@@ -9,6 +14,8 @@ import {
   VacancyPreview,
   VacancyStatus,
 } from "../types";
+import { ApiSearchConfig } from "../config/apiSearchConfigs";
+import { NormalizedVacancy } from "../types/vacancy";
 import { logger } from "../utils/logger";
 import { formatVacancyAnalysis } from "../bot/formatters";
 import { passesCheapVacancyFilter } from "./prefilter";
@@ -21,6 +28,96 @@ import {
 
 const MATCH_THRESHOLD = 70;
 export const ANALYZE_FIRST_CALLBACK = "analyze_first_vacancy";
+export type SearchSource = "playwright" | "api";
+
+const mapNormalizedVacancyToPreview = (
+  vacancy: NormalizedVacancy,
+  searchUrl: string,
+): VacancyPreview => ({
+  id: vacancy.id,
+  title: vacancy.title,
+  company: vacancy.company,
+  salary: vacancy.salary ?? "Не указано",
+  url: vacancy.url,
+  searchUrl,
+});
+
+const loadVacanciesFromApi = async (
+  config: ApiSearchConfig,
+): Promise<VacancyPreview[]> => {
+  const searchUrl = buildHhSearchUrlFromApiConfig(config);
+
+  logger.info("Using HH API", {
+    text: config.text,
+    area: config.area,
+  });
+
+  const vacancies = await fetchVacanciesFromApi({
+    ...config,
+    per_page: 50,
+    page: 0,
+  });
+
+  return vacancies.map((vacancy) =>
+    mapNormalizedVacancyToPreview(vacancy, searchUrl),
+  );
+};
+
+const loadVacanciesFromPlaywright = async (
+  searchUrl: string,
+): Promise<VacancyPreview[]> => {
+  const vacancies = await parseHhSearchResults(searchUrl);
+  logger.info("Search URL parsed vacancies", {
+    searchUrl,
+    count: vacancies.length,
+  });
+
+  return vacancies;
+};
+
+const collectApiBackedVacancies = async (): Promise<VacancyPreview[]> => {
+  const vacancies: VacancyPreview[] = [];
+
+  for (const config of API_SEARCH_CONFIGS) {
+    const fallbackSearchUrl = buildHhSearchUrlFromApiConfig(config);
+
+    try {
+      const apiVacancies = await loadVacanciesFromApi(config);
+      vacancies.push(...apiVacancies);
+      logger.info("HH API parsed vacancies", {
+        searchUrl: fallbackSearchUrl,
+        count: apiVacancies.length,
+      });
+    } catch (error) {
+      logger.info("Fallback to Playwright", {
+        text: config.text,
+        area: config.area,
+      });
+      logger.error("HH API source failed, using Playwright fallback", {
+        text: config.text,
+        area: config.area,
+        error,
+      });
+
+      const fallbackVacancies =
+        await loadVacanciesFromPlaywright(fallbackSearchUrl);
+      vacancies.push(...fallbackVacancies);
+    }
+  }
+
+  return vacancies;
+};
+
+const collectPlaywrightVacancies = async (): Promise<VacancyPreview[]> => {
+  const vacancies: VacancyPreview[] = [];
+
+  for (const searchUrl of SEARCH_URLS) {
+    const parsedVacancies = await loadVacanciesFromPlaywright(searchUrl);
+    vacancies.push(...parsedVacancies);
+  }
+
+  return vacancies;
+};
 
 const buildRecord = (
   preview: VacancyPreview,
@@ -58,25 +155,24 @@ const getAnalyzeKeyboard = (): InlineKeyboard =>
     ANALYZE_FIRST_CALLBACK,
   );
 
-export const collectSearchQueue = async (): Promise<{
+export const collectSearchQueue = async (
+  source: SearchSource = "api",
+): Promise<{
   savedCount: number;
   queuedCount: number;
 }> => {
   const uniqueVacancies = new Map<string, VacancyPreview>();
+  const collectedVacancies =
+    source === "api"
+      ? await collectApiBackedVacancies()
+      : await collectPlaywrightVacancies();
   let totalParsed = 0;
 
-  for (const searchUrl of SEARCH_URLS) {
-    const vacancies = await parseHhSearchResults(searchUrl);
-    logger.info("Search URL parsed vacancies", {
-      searchUrl,
-      count: vacancies.length,
-    });
-    totalParsed += vacancies.length;
+  for (const vacancy of collectedVacancies) {
+    totalParsed += 1;
 
-    for (const vacancy of vacancies) {
-      if (!uniqueVacancies.has(vacancy.id)) {
-        uniqueVacancies.set(vacancy.id, vacancy);
-      }
+    if (!uniqueVacancies.has(vacancy.id)) {
+      uniqueVacancies.set(vacancy.id, vacancy);
     }
   }
 
@@ -102,6 +198,7 @@ export const collectSearchQueue = async (): Promise<{
 
   const queuedCount = await getQueuedVacancyCount();
   logger.info("Search queue collection summary", {
+    source,
     totalParsed,
     uniqueCount: uniqueVacancies.size,
     savedCount,

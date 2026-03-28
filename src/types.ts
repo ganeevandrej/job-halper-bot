@@ -25,6 +25,7 @@ export interface VacancyAnalysis {
 
 export type VacancyStatus =
   | "queued"
+  | "manual_skipped"
   | "analyzed_fit"
   | "analyzed_skip"
   | "prefilter_rejected";

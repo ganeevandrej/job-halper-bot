@@ -12,6 +12,7 @@ const mapDecision = (value: unknown): "yes" | "no" | null => {
 const mapStatus = (value: unknown): VacancyStatus => {
   if (
     value === "queued" ||
+    value === "manual_skipped" ||
     value === "analyzed_fit" ||
     value === "analyzed_skip" ||
     value === "prefilter_rejected"
@@ -184,4 +185,63 @@ export const getFirstQueuedVacancy = async (): Promise<ProcessedVacancyRecord | 
   } finally {
     statement.free();
   }
+};
+
+export const getQueuedVacancies = async (
+  limit: number,
+  offset: number,
+): Promise<ProcessedVacancyRecord[]> => {
+  const { db } = await getDatabase();
+  const statement = db.prepare(
+    `
+      SELECT
+        id,
+        title,
+        company,
+        salary,
+        url,
+        search_url,
+        status,
+        match_percent,
+        reason,
+        decision,
+        processed_at,
+        sent_at
+      FROM processed_vacancies
+      WHERE status = 'queued'
+      ORDER BY processed_at ASC
+      LIMIT ? OFFSET ?
+    `,
+  );
+
+  try {
+    statement.bind([limit, offset]);
+    const records: ProcessedVacancyRecord[] = [];
+
+    while (statement.step()) {
+      records.push(mapRowToRecord(statement.getAsObject()));
+    }
+
+    return records;
+  } finally {
+    statement.free();
+  }
+};
+
+export const markVacancyStatus = async (
+  id: string,
+  status: VacancyStatus,
+): Promise<void> => {
+  const { db } = await getDatabase();
+
+  db.run(
+    `
+      UPDATE processed_vacancies
+      SET status = ?, processed_at = ?
+      WHERE id = ?
+    `,
+    [status, new Date().toISOString(), id],
+  );
+
+  await persistDatabase();
 };
