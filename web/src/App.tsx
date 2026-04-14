@@ -259,7 +259,7 @@ function App() {
               multiple
               size={5}
               value={statuses}
-              onChange={(event) => {
+              onChange={(event ) => {
                 const nextStatuses = Array.from(event.target.selectedOptions).map(
                   (option) => option.value as VacancyStatus,
                 );
