@@ -10,6 +10,10 @@ export const env = {
   groqApiKey: process.env.GROQ_API_KEY || "",
   groqBaseUrl: "https://api.groq.com/openai/v1",
   groqModel: process.env.GROQ_MODEL || "llama-3.3-70b-versatile",
+  hhApiUserAgent:
+    process.env.HH_API_USER_AGENT ||
+    "job-helper-api/1.0 (ganeev_andrey@vk.com)",
+  hhAccessToken: process.env.HH_ACCESS_TOKEN || "",
   vkGroupToken: process.env.VK_GROUP_TOKEN || "",
   vkGroupId: Number(process.env.VK_GROUP_ID || 0),
   vkDigestPeerId: Number(process.env.VK_DIGEST_PEER_ID || 0),

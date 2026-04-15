@@ -7,7 +7,12 @@ import {
   runSearch,
   updateVacancyStatus,
 } from "./api";
-import { Vacancy, VacancyStats, VacancyStatus } from "./types";
+import {
+  CoverLetterFocus,
+  Vacancy,
+  VacancyStats,
+  VacancyStatus,
+} from "./types";
 
 const PAGE_SIZE = 20;
 const DEFAULT_STATUSES: VacancyStatus[] = ["new", "viewed"];
@@ -27,6 +32,18 @@ const STATUS_LABELS: Record<VacancyStatus, string> = {
   applied: "Откликнулся",
   hidden: "Скрыта",
 };
+
+const COVER_LETTER_FOCUS_OPTIONS: Array<{
+  label: string;
+  value: CoverLetterFocus;
+}> = [
+  { label: "Задачи", value: "tasks" },
+  { label: "Продукт", value: "product" },
+  { label: "Сфера", value: "domain" },
+  { label: "Стек", value: "stack" },
+  { label: "Похожий опыт", value: "experience" },
+  { label: "Коротко", value: "short" },
+];
 
 const formatDate = (value: string | null): string => {
   if (!value) {
@@ -52,6 +69,9 @@ function App() {
   const [analyzing, setAnalyzing] = useState(false);
   const [searching, setSearching] = useState(false);
   const [statusUpdating, setStatusUpdating] = useState(false);
+  const [coverLetterFocuses, setCoverLetterFocuses] = useState<
+    CoverLetterFocus[]
+  >(["tasks"]);
   const [error, setError] = useState<string | null>(null);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -171,7 +191,7 @@ function App() {
     setError(null);
 
     try {
-      const vacancy = await analyzeVacancy(selectedId);
+      const vacancy = await analyzeVacancy(selectedId, coverLetterFocuses);
       await syncAfterChange(vacancy);
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "Не удалось выполнить анализ");
@@ -180,7 +200,7 @@ function App() {
     }
   };
 
-  const handleStatusChange = async (nextStatus: VacancyStatus) => {
+  const handleApply = async () => {
     if (!selectedVacancy) {
       return;
     }
@@ -189,13 +209,25 @@ function App() {
     setError(null);
 
     try {
-      const vacancy = await updateVacancyStatus(selectedVacancy.id, nextStatus);
+      const vacancy = await updateVacancyStatus(selectedVacancy.id, "applied");
       await syncAfterChange(vacancy);
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : "Не удалось обновить статус");
+      setError(nextError instanceof Error ? nextError.message : "Не удалось отметить отклик");
     } finally {
       setStatusUpdating(false);
     }
+  };
+
+  const toggleCoverLetterFocus = (focus: CoverLetterFocus) => {
+    setCoverLetterFocuses((current) => {
+      if (current.includes(focus)) {
+        return current.length > 1
+          ? current.filter((item) => item !== focus)
+          : current;
+      }
+
+      return [...current, focus];
+    });
   };
 
   const handleHide = async (event: React.MouseEvent, vacancyId: string) => {
@@ -225,7 +257,11 @@ function App() {
           <div className="eyebrow">Job Helper</div>
           <h1>Вакансии</h1>
         </div>
-        <button className="primaryButton" onClick={handleRunSearch} disabled={searching}>
+        <button
+          className="primaryButton"
+          onClick={handleRunSearch}
+          disabled={searching}
+        >
           {searching ? "Ищу..." : "Запустить поиск"}
         </button>
       </header>
@@ -260,11 +296,13 @@ function App() {
               size={5}
               value={statuses}
               onChange={(event) => {
-                const nextStatuses = Array.from(event.target.selectedOptions).map(
-                  (option) => option.value as VacancyStatus,
-                );
+                const nextStatuses = Array.from(
+                  event.target.selectedOptions,
+                ).map((option) => option.value as VacancyStatus);
                 setPage(1);
-                setStatuses(nextStatuses.length > 0 ? nextStatuses : DEFAULT_STATUSES);
+                setStatuses(
+                  nextStatuses.length > 0 ? nextStatuses : DEFAULT_STATUSES,
+                );
               }}
             >
               {STATUS_OPTIONS.map((option) => (
@@ -327,11 +365,16 @@ function App() {
           </div>
 
           <div className="pagination">
-            <button onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={page <= 1}>
+            <button
+              onClick={() => setPage((current) => Math.max(1, current - 1))}
+              disabled={page <= 1}
+            >
               Назад
             </button>
             <button
-              onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+              onClick={() =>
+                setPage((current) => Math.min(totalPages, current + 1))
+              }
               disabled={page >= totalPages}
             >
               Вперед
@@ -342,16 +385,49 @@ function App() {
         <div className="panel detailsPanel">
           <div className="panelHeader">
             <h2>Детали</h2>
-            <button
-              className="primaryButton"
-              onClick={handleAnalyze}
-              disabled={!selectedId || analyzing}
-            >
-              {analyzing ? "Анализирую..." : "Анализировать"}
-            </button>
+            <div className="detailsActions">
+              <button
+                // type="button"
+                className="secondaryButton mediumSize"
+                onClick={() => void handleApply()}
+                disabled={
+                  !selectedVacancy ||
+                  statusUpdating ||
+                  selectedVacancy.status === "applied"
+                }
+              >
+                Откликнулся
+              </button>
+              <button
+                className="primaryButton"
+                onClick={handleAnalyze}
+                disabled={!selectedId || analyzing}
+              >
+                {analyzing ? "Анализирую..." : "Анализировать"}
+              </button>
+            </div>
           </div>
 
-          {detailsLoading ? <div className="emptyState">Загружаю детали...</div> : null}
+          <div className="focusSelector">
+            <span className="detailLabel">Акцент письма</span>
+            <div className="focusTags">
+              {COVER_LETTER_FOCUS_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  className={`focusTag ${coverLetterFocuses.includes(option.value) ? "active" : ""}`}
+                  onClick={() => toggleCoverLetterFocus(option.value)}
+                  disabled={analyzing}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {detailsLoading ? (
+            <div className="emptyState">Загружаю детали...</div>
+          ) : null}
 
           {!detailsLoading && selectedVacancy ? (
             <div className="detailsContent">
@@ -367,19 +443,13 @@ function App() {
               <div className="detailGrid">
                 <div>
                   <span className="detailLabel">Статус</span>
-                  <select
-                    value={selectedVacancy.status}
-                    onChange={(event) =>
-                      void handleStatusChange(event.target.value as VacancyStatus)
-                    }
-                    disabled={statusUpdating}
-                  >
-                    {STATUS_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
+                  <div>
+                    <span
+                      className={`statusBadge status-${selectedVacancy.status}`}
+                    >
+                      {STATUS_LABELS[selectedVacancy.status]}
+                    </span>
+                  </div>
                 </div>
                 <div>
                   <span className="detailLabel">Создана</span>
@@ -397,7 +467,9 @@ function App() {
 
               <div className="detailBlock">
                 <span className="detailLabel">Описание</span>
-                <pre>{selectedVacancy.description || "Описание пока не загружено"}</pre>
+                <pre>
+                  {selectedVacancy.description || "Описание пока не загружено"}
+                </pre>
               </div>
 
               <div className="detailBlock">

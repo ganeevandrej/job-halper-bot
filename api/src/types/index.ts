@@ -23,6 +23,14 @@ export interface VacancyAnalysis {
   cover_letter: string;
 }
 
+export type CoverLetterFocus =
+  | "tasks"
+  | "product"
+  | "domain"
+  | "stack"
+  | "experience"
+  | "short";
+
 export type VacancyStatus =
   | "new"
   | "viewed"

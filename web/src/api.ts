@@ -1,4 +1,10 @@
-import { Vacancy, VacancyListResponse, VacancyStats, VacancyStatus } from "./types";
+import {
+  CoverLetterFocus,
+  Vacancy,
+  VacancyListResponse,
+  VacancyStats,
+  VacancyStatus,
+} from "./types";
 
 const API_BASE_URL =
   (import.meta.env.VITE_API_BASE_URL as string | undefined) ||
@@ -44,9 +50,13 @@ export const getVacancies = async (
 export const getVacancy = async (id: string): Promise<Vacancy> =>
   fetchJson<Vacancy>(`/vacancies/${id}`);
 
-export const analyzeVacancy = async (id: string): Promise<Vacancy> =>
+export const analyzeVacancy = async (
+  id: string,
+  coverLetterFocuses: CoverLetterFocus[],
+): Promise<Vacancy> =>
   fetchJson<Vacancy>(`/vacancies/${id}/analyze`, {
     method: "POST",
+    body: JSON.stringify({ coverLetterFocuses }),
   });
 
 export const updateVacancyStatus = async (

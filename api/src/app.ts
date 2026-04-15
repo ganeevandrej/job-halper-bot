@@ -11,7 +11,7 @@ import {
   setVacancyStatus,
 } from "./services/vacancyService";
 import { getVacancyStats } from "./storage/vacancyRepository";
-import { VacancyStatus } from "./types";
+import { CoverLetterFocus, VacancyStatus } from "./types";
 
 const ALLOWED_STATUSES: VacancyStatus[] = [
   "new",
@@ -19,6 +19,15 @@ const ALLOWED_STATUSES: VacancyStatus[] = [
   "rejected",
   "applied",
   "hidden",
+];
+
+const ALLOWED_COVER_LETTER_FOCUSES: CoverLetterFocus[] = [
+  "tasks",
+  "product",
+  "domain",
+  "stack",
+  "experience",
+  "short",
 ];
 
 const parseStatus = (value: unknown): VacancyStatus | undefined => {
@@ -29,6 +38,30 @@ const parseStatus = (value: unknown): VacancyStatus | undefined => {
   return ALLOWED_STATUSES.includes(value as VacancyStatus)
     ? (value as VacancyStatus)
     : undefined;
+};
+
+const parseCoverLetterFocus = (value: unknown): CoverLetterFocus | undefined => {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  return ALLOWED_COVER_LETTER_FOCUSES.includes(value as CoverLetterFocus)
+    ? (value as CoverLetterFocus)
+    : undefined;
+};
+
+const parseCoverLetterFocuses = (value: unknown): CoverLetterFocus[] => {
+  const values = Array.isArray(value)
+    ? value
+    : typeof value === "string"
+      ? [value]
+      : [];
+
+  const focuses = values
+    .map((item) => parseCoverLetterFocus(item))
+    .filter((item): item is CoverLetterFocus => Boolean(item));
+
+  return Array.from(new Set(focuses));
 };
 
 const parseStatuses = (value: unknown): VacancyStatus[] => {
@@ -121,7 +154,10 @@ export const createApp = () => {
       return;
     }
 
-    const vacancy = await analyzeVacancyById(vacancyId);
+    const coverLetterFocuses = parseCoverLetterFocuses(
+      request.body?.coverLetterFocuses ?? request.body?.coverLetterFocus,
+    );
+    const vacancy = await analyzeVacancyById(vacancyId, coverLetterFocuses);
 
     if (!vacancy) {
       response.status(404).json({ error: "Vacancy not found" });

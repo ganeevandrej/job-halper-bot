@@ -6,7 +6,13 @@ import {
   updateVacancyStatus,
   updateVacancyDescription,
 } from "../storage/vacancyRepository";
-import { VacancyDetails, VacancyRecord, VacancyStatus } from "../types";
+import {
+  CoverLetterFocus,
+  VacancyDetails,
+  VacancyRecord,
+  VacancyStatus,
+} from "../types";
+import { logger } from "../utils/logger";
 import { analyzeVacancy } from "./analysisService";
 
 export const getVacancies = async (
@@ -43,8 +49,13 @@ export const getVacancy = async (id: string): Promise<VacancyRecord | null> => {
     return vacancy;
   }
 
-  const details = await fetchVacancyDetailsFromApi(vacancy.url);
-  await updateVacancyDescription(id, details.description);
+  try {
+    const details = await fetchVacancyDetailsFromApi(vacancy.url);
+    await updateVacancyDescription(id, details.description);
+  } catch (error) {
+    logger.error("Failed to load vacancy details", error);
+    return vacancy;
+  }
 
   return getVacancyById(id);
 };
@@ -59,6 +70,7 @@ const buildDetails = (vacancy: VacancyRecord): VacancyDetails => ({
 
 export const analyzeVacancyById = async (
   id: string,
+  coverLetterFocuses?: CoverLetterFocus[],
 ): Promise<VacancyRecord | null> => {
   const vacancy = await getVacancyById(id);
 
@@ -74,7 +86,7 @@ export const analyzeVacancyById = async (
     details = apiDetails;
   }
 
-  const analysis = await analyzeVacancy(details);
+  const analysis = await analyzeVacancy(details, coverLetterFocuses);
   await saveVacancyAnalysis(id, analysis);
 
   return getVacancyById(id);

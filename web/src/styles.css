@@ -247,6 +247,60 @@ select {
   gap: 18px;
 }
 
+.focusSelector {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.focusTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.focusTag {
+  border: 1px solid rgba(19, 32, 24, 0.12);
+  border-radius: 999px;
+  padding: 8px 11px;
+  color: #132018;
+  background: #fffdf8;
+  cursor: pointer;
+}
+
+.focusTag.active {
+  border-color: #135946;
+  color: #fffdf8;
+  background: #135946;
+}
+
+.focusTag:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.detailsActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.secondaryButton {
+  border: 1px solid rgba(19, 32, 24, 0.12);
+  border-radius: 999px;
+  padding: 8px 11px;
+  color: #132018;
+  background: #fffdf8;
+  cursor: pointer;
+}
+
+.secondaryButton:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
 .detailBlock {
   display: flex;
   flex-direction: column;
