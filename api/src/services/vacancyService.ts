@@ -7,7 +7,6 @@ import {
   updateVacancyDescription,
 } from "../storage/vacancyRepository";
 import {
-  CoverLetterFocus,
   VacancyDetails,
   VacancyRecord,
   VacancyStatus,
@@ -70,7 +69,6 @@ const buildDetails = (vacancy: VacancyRecord): VacancyDetails => ({
 
 export const analyzeVacancyById = async (
   id: string,
-  coverLetterFocuses?: CoverLetterFocus[],
 ): Promise<VacancyRecord | null> => {
   const vacancy = await getVacancyById(id);
 
@@ -86,7 +84,7 @@ export const analyzeVacancyById = async (
     details = apiDetails;
   }
 
-  const analysis = await analyzeVacancy(details, coverLetterFocuses);
+  const analysis = await analyzeVacancy(details);
   await saveVacancyAnalysis(id, analysis);
 
   return getVacancyById(id);

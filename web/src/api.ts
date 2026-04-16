@@ -1,5 +1,4 @@
 import {
-  CoverLetterFocus,
   Vacancy,
   VacancyListResponse,
   VacancyStats,
@@ -50,13 +49,9 @@ export const getVacancies = async (
 export const getVacancy = async (id: string): Promise<Vacancy> =>
   fetchJson<Vacancy>(`/vacancies/${id}`);
 
-export const analyzeVacancy = async (
-  id: string,
-  coverLetterFocuses: CoverLetterFocus[],
-): Promise<Vacancy> =>
+export const analyzeVacancy = async (id: string): Promise<Vacancy> =>
   fetchJson<Vacancy>(`/vacancies/${id}/analyze`, {
     method: "POST",
-    body: JSON.stringify({ coverLetterFocuses }),
   });
 
 export const updateVacancyStatus = async (

@@ -5,14 +5,6 @@ export type VacancyStatus =
   | "applied"
   | "hidden";
 
-export type CoverLetterFocus =
-  | "tasks"
-  | "product"
-  | "domain"
-  | "stack"
-  | "experience"
-  | "short";
-
 export interface Vacancy {
   id: string;
   title: string;

@@ -8,7 +8,6 @@ import {
   updateVacancyStatus,
 } from "./api";
 import {
-  CoverLetterFocus,
   Vacancy,
   VacancyStats,
   VacancyStatus,
@@ -32,18 +31,6 @@ const STATUS_LABELS: Record<VacancyStatus, string> = {
   applied: "Откликнулся",
   hidden: "Скрыта",
 };
-
-const COVER_LETTER_FOCUS_OPTIONS: Array<{
-  label: string;
-  value: CoverLetterFocus;
-}> = [
-  { label: "Задачи", value: "tasks" },
-  { label: "Продукт", value: "product" },
-  { label: "Сфера", value: "domain" },
-  { label: "Стек", value: "stack" },
-  { label: "Похожий опыт", value: "experience" },
-  { label: "Коротко", value: "short" },
-];
 
 const formatDate = (value: string | null): string => {
   if (!value) {
@@ -69,9 +56,6 @@ function App() {
   const [analyzing, setAnalyzing] = useState(false);
   const [searching, setSearching] = useState(false);
   const [statusUpdating, setStatusUpdating] = useState(false);
-  const [coverLetterFocuses, setCoverLetterFocuses] = useState<
-    CoverLetterFocus[]
-  >(["tasks"]);
   const [error, setError] = useState<string | null>(null);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -191,7 +175,7 @@ function App() {
     setError(null);
 
     try {
-      const vacancy = await analyzeVacancy(selectedId, coverLetterFocuses);
+      const vacancy = await analyzeVacancy(selectedId);
       await syncAfterChange(vacancy);
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "Не удалось выполнить анализ");
@@ -216,18 +200,6 @@ function App() {
     } finally {
       setStatusUpdating(false);
     }
-  };
-
-  const toggleCoverLetterFocus = (focus: CoverLetterFocus) => {
-    setCoverLetterFocuses((current) => {
-      if (current.includes(focus)) {
-        return current.length > 1
-          ? current.filter((item) => item !== focus)
-          : current;
-      }
-
-      return [...current, focus];
-    });
   };
 
   const handleHide = async (event: React.MouseEvent, vacancyId: string) => {
@@ -405,23 +377,6 @@ function App() {
               >
                 {analyzing ? "Анализирую..." : "Анализировать"}
               </button>
-            </div>
-          </div>
-
-          <div className="focusSelector">
-            <span className="detailLabel">Акцент письма</span>
-            <div className="focusTags">
-              {COVER_LETTER_FOCUS_OPTIONS.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  className={`focusTag ${coverLetterFocuses.includes(option.value) ? "active" : ""}`}
-                  onClick={() => toggleCoverLetterFocus(option.value)}
-                  disabled={analyzing}
-                >
-                  {option.label}
-                </button>
-              ))}
             </div>
           </div>
 
