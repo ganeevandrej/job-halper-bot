@@ -1,12 +1,14 @@
 export type ManualVacancyStatus =
   | "new"
-  | "viewed"
-  | "rejected"
+  | "analyzed"
   | "applied"
-  | "hidden";
+  | "not_fit"
+  | "archived";
 
 export interface ManualVacancy {
   id: string;
+  hhId: string | null;
+  url: string | null;
   rawText: string;
   status: ManualVacancyStatus;
   title: string;
@@ -42,10 +44,15 @@ export interface ManualVacancyListResponse {
 export interface CreateManualVacancyRequest {
   rawText: string;
   salaryOverride?: string;
+  hhId?: string;
+  url?: string;
+  company?: string;
 }
 
 export type UpdateManualVacancyRequest = Partial<{
   rawText: string;
+  hhId: string | null;
+  url: string | null;
   status: ManualVacancyStatus;
   title: string;
   company: string;

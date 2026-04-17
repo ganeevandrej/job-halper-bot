@@ -26,6 +26,8 @@ const ensureDataDir = (filePath: string): void => {
 const createManualVacanciesTableSql = (tableName: string): string => `
   CREATE TABLE IF NOT EXISTS ${tableName} (
     id TEXT PRIMARY KEY,
+    hh_id TEXT,
+    url TEXT,
     raw_text TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'new',
     title TEXT NOT NULL,
@@ -73,13 +75,15 @@ const migrateNullableSalary = (db: Database): void => {
   db.run(createManualVacanciesTableSql("manual_vacancies_next"));
   db.run(`
     INSERT INTO manual_vacancies_next (
-      id, raw_text, status, title, company, salary, estimated_salary, format,
-      formats_json, location, grade, stack_json, tasks_json, requirements_json,
+      id, hh_id, url, raw_text, status, title, company, salary, estimated_salary,
+      format, formats_json, location, grade, stack_json, tasks_json, requirements_json,
       nice_to_have_json, red_flags_json, summary, match_percent, decision,
       reason, salary_estimate, cover_letter, created_at, updated_at, analyzed_at
     )
     SELECT
       id,
+      hh_id,
+      url,
       raw_text,
       status,
       title,
@@ -110,6 +114,19 @@ const migrateNullableSalary = (db: Database): void => {
   db.run("ALTER TABLE manual_vacancies_next RENAME TO manual_vacancies");
 };
 
+const migrateManualVacancyStatuses = (db: Database): void => {
+  db.run(`
+    UPDATE manual_vacancies
+    SET status = CASE status
+      WHEN 'viewed' THEN 'new'
+      WHEN 'rejected' THEN 'not_fit'
+      WHEN 'hidden' THEN 'archived'
+      ELSE status
+    END
+    WHERE status IN ('viewed', 'rejected', 'hidden')
+  `);
+};
+
 const initSchema = (db: Database): void => {
   db.run(createManualVacanciesTableSql("manual_vacancies"));
 
@@ -123,11 +140,20 @@ const initSchema = (db: Database): void => {
     db.run("ALTER TABLE manual_vacancies ADD COLUMN estimated_salary TEXT");
   }
 
+  if (!columnNames.has("hh_id")) {
+    db.run("ALTER TABLE manual_vacancies ADD COLUMN hh_id TEXT");
+  }
+
+  if (!columnNames.has("url")) {
+    db.run("ALTER TABLE manual_vacancies ADD COLUMN url TEXT");
+  }
+
   if (!columnNames.has("status")) {
     db.run("ALTER TABLE manual_vacancies ADD COLUMN status TEXT NOT NULL DEFAULT 'new'");
   }
 
   migrateNullableSalary(db);
+  migrateManualVacancyStatuses(db);
 };
 
 const createContext = async (): Promise<ManualVacancyDatabaseContext> => {

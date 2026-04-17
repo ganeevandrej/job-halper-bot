@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type MouseEvent } from "react";
 import {
   analyzeManualVacancy,
-  createAndAnalyzeManualVacancy,
+  createManualVacancy,
   getManualVacancies,
   getManualVacancy,
   updateManualVacancy,
@@ -15,13 +15,13 @@ const PAGE_SIZE = 20;
 
 const STATUS_LABELS: Record<ManualVacancyStatus, string> = {
   new: "Новая",
-  viewed: "Просмотрена",
-  rejected: "Отклонена",
+  analyzed: "Проанализирована",
   applied: "Откликнулся",
-  hidden: "Скрыта",
+  not_fit: "Не подхожу",
+  archived: "В архиве",
 };
 
-interface DetailsFormState {
+interface EditFormState {
   rawText: string;
 }
 
@@ -33,9 +33,32 @@ const formatDate = (value: string | null): string => {
   return new Date(value).toLocaleString();
 };
 
-const getInitialFormState = (vacancy: ManualVacancy): DetailsFormState => ({
+const getInitialEditFormState = (vacancy: ManualVacancy): EditFormState => ({
   rawText: vacancy.rawText,
 });
+
+const formatList = (items: string[]): string =>
+  items.length > 0 ? items.join(", ") : "-";
+
+const closeOnBackdropMouseDown = (
+  event: MouseEvent<HTMLDivElement>,
+  close: () => void,
+) => {
+  if (event.target === event.currentTarget) {
+    close();
+  }
+};
+
+const DetailList = ({ items }: { items: string[] }) =>
+  items.length > 0 ? (
+    <ul className="detailList">
+      {items.map((item) => (
+        <li key={item}>{item}</li>
+      ))}
+    </ul>
+  ) : (
+    <div>-</div>
+  );
 
 function ManualVacanciesPage() {
   const [items, setItems] = useState<ManualVacancy[]>([]);
@@ -45,14 +68,16 @@ function ManualVacanciesPage() {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [rawText, setRawText] = useState("");
-  const [salaryOverride, setSalaryOverride] = useState("");
+  const [company, setCompany] = useState("");
+  const [hhId, setHhId] = useState("");
   const [listLoading, setListLoading] = useState(false);
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [statusUpdating, setStatusUpdating] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
-  const [detailsSaving, setDetailsSaving] = useState(false);
-  const [detailsForm, setDetailsForm] = useState<DetailsFormState | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editForm, setEditForm] = useState<EditFormState | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -83,14 +108,6 @@ function ManualVacanciesPage() {
     try {
       const vacancy = await getManualVacancy(id);
       setSelectedVacancy(vacancy);
-
-      if (vacancy.status === "new") {
-        const updated = await updateManualVacancy(vacancy.id, {
-          status: "viewed",
-        });
-        setSelectedVacancy(updated);
-        await loadList(page);
-      }
     } catch (nextError) {
       setError(
         nextError instanceof Error
@@ -122,21 +139,23 @@ function ManualVacanciesPage() {
     setError(null);
 
     try {
-      const vacancy = await createAndAnalyzeManualVacancy({
+      const vacancy = await createManualVacancy({
         rawText: rawText.trim(),
-        salaryOverride: salaryOverride.trim() || undefined,
+        company: company.trim() || undefined,
+        hhId: hhId.trim() || undefined,
       });
       setSelectedId(vacancy.id);
       setSelectedVacancy(vacancy);
       setRawText("");
-      setSalaryOverride("");
+      setCompany("");
+      setHhId("");
       setPage(1);
       await loadList(1);
     } catch (nextError) {
       setError(
         nextError instanceof Error
           ? nextError.message
-          : "Не удалось разобрать и проанализировать вакансию",
+          : "Не удалось добавить вакансию",
       );
     } finally {
       setAnalyzing(false);
@@ -191,25 +210,87 @@ function ManualVacanciesPage() {
     }
   };
 
+  const handleSetNotFit = async () => {
+    if (!selectedVacancy) {
+      return;
+    }
+
+    setStatusUpdating(true);
+    setError(null);
+
+    try {
+      const vacancy = await updateManualVacancy(selectedVacancy.id, {
+        status: "not_fit",
+      });
+      setSelectedVacancy(vacancy);
+      await loadList(page);
+    } catch (nextError) {
+      setError(
+        nextError instanceof Error
+          ? nextError.message
+          : "Не удалось отметить вакансию как неподходящую",
+      );
+    } finally {
+      setStatusUpdating(false);
+    }
+  };
+
+  const handleSetArchived = async () => {
+    if (!selectedVacancy) {
+      return;
+    }
+
+    setStatusUpdating(true);
+    setError(null);
+
+    try {
+      const vacancy = await updateManualVacancy(selectedVacancy.id, {
+        status: "archived",
+      });
+      setSelectedVacancy(vacancy);
+      await loadList(page);
+    } catch (nextError) {
+      setError(
+        nextError instanceof Error
+          ? nextError.message
+          : "Не удалось отправить вакансию в архив",
+      );
+    } finally {
+      setStatusUpdating(false);
+    }
+  };
+
   const openDetails = () => {
     if (!selectedVacancy) {
       return;
     }
 
-    setDetailsForm(getInitialFormState(selectedVacancy));
     setDetailsOpen(true);
   };
 
   const closeDetails = () => {
     setDetailsOpen(false);
-    setDetailsForm(null);
   };
 
-  const updateDetailsField = <Key extends keyof DetailsFormState>(
+  const openEdit = () => {
+    if (!selectedVacancy) {
+      return;
+    }
+
+    setEditForm(getInitialEditFormState(selectedVacancy));
+    setEditOpen(true);
+  };
+
+  const closeEdit = () => {
+    setEditOpen(false);
+    setEditForm(null);
+  };
+
+  const updateEditField = <Key extends keyof EditFormState>(
     key: Key,
-    value: DetailsFormState[Key],
+    value: EditFormState[Key],
   ) => {
-    setDetailsForm((current) =>
+    setEditForm((current) =>
       current
         ? {
             ...current,
@@ -219,22 +300,22 @@ function ManualVacanciesPage() {
     );
   };
 
-  const saveDetails = async (shouldAnalyze: boolean) => {
-    if (!selectedVacancy || !detailsForm) {
+  const saveEdit = async (shouldAnalyze: boolean) => {
+    if (!selectedVacancy || !editForm) {
       return;
     }
 
-    if (detailsForm.rawText.trim().length < 20) {
+    if (editForm.rawText.trim().length < 20) {
       setError("Текст вакансии должен быть минимум 20 символов");
       return;
     }
 
-    setDetailsSaving(true);
+    setEditSaving(true);
     setError(null);
 
     try {
       let vacancy = await updateManualVacancy(selectedVacancy.id, {
-        rawText: detailsForm.rawText.trim(),
+        rawText: editForm.rawText.trim(),
       });
       setSelectedVacancy(vacancy);
 
@@ -245,7 +326,7 @@ function ManualVacanciesPage() {
       }
 
       await loadList(page);
-      closeDetails();
+      closeEdit();
     } catch (nextError) {
       setError(
         nextError instanceof Error
@@ -253,17 +334,17 @@ function ManualVacanciesPage() {
           : "Не удалось сохранить детали",
       );
     } finally {
-      setDetailsSaving(false);
+      setEditSaving(false);
       setAnalyzing(false);
     }
   };
 
-  const handleSaveDetails = async () => {
-    await saveDetails(false);
+  const handleSaveEdit = async () => {
+    await saveEdit(false);
   };
 
-  const handleSaveAndAnalyzeDetails = async () => {
-    await saveDetails(true);
+  const handleSaveAndAnalyzeEdit = async () => {
+    await saveEdit(true);
   };
 
   return (
@@ -294,11 +375,20 @@ function ManualVacanciesPage() {
           </label>
 
           <label className="fieldGroup">
-            <span className="detailLabel">Зарплата, если хочешь уточнить</span>
+            <span className="detailLabel">hh id</span>
             <input
-              value={salaryOverride}
-              onChange={(event) => setSalaryOverride(event.target.value)}
-              placeholder="Например: 180000-250000 руб"
+              value={hhId}
+              onChange={(event) => setHhId(event.target.value)}
+              placeholder="Например: 131781465"
+            />
+          </label>
+
+          <label className="fieldGroup">
+            <span className="detailLabel">Компания</span>
+            <input
+              value={company}
+              onChange={(event) => setCompany(event.target.value)}
+              placeholder="Например: ООО Логинет РУс"
             />
           </label>
 
@@ -307,7 +397,7 @@ function ManualVacanciesPage() {
             onClick={handleAnalyze}
             disabled={analyzing}
           >
-            {analyzing ? "Разбираю и анализирую..." : "Разобрать и проанализировать"}
+            {analyzing ? "Добавляю..." : "Добавить вакансию"}
           </button>
 
           <div className="manualListHeader">
@@ -377,6 +467,24 @@ function ManualVacanciesPage() {
               </button>
               <button
                 className="secondaryButton"
+                onClick={openEdit}
+                disabled={!selectedVacancy}
+              >
+                Редактировать
+              </button>
+              <a
+                className={`secondaryButton linkButton ${
+                  selectedVacancy?.url ? "" : "disabled"
+                }`}
+                href={selectedVacancy?.url || undefined}
+                target="_blank"
+                rel="noreferrer"
+                aria-disabled={!selectedVacancy?.url}
+              >
+                Открыть в hh.ru
+              </a>
+              <button
+                className="secondaryButton"
                 onClick={handleSetApplied}
                 disabled={
                   !selectedVacancy ||
@@ -387,11 +495,33 @@ function ManualVacanciesPage() {
                 Откликнулся
               </button>
               <button
+                className="secondaryButton"
+                onClick={handleSetNotFit}
+                disabled={
+                  !selectedVacancy ||
+                  statusUpdating ||
+                  selectedVacancy.status === "not_fit"
+                }
+              >
+                Не подхожу
+              </button>
+              <button
+                className="secondaryButton"
+                onClick={handleSetArchived}
+                disabled={
+                  !selectedVacancy ||
+                  statusUpdating ||
+                  selectedVacancy.status === "archived"
+                }
+              >
+                В архив
+              </button>
+              <button
                 className="primaryButton"
                 onClick={handleReanalyze}
                 disabled={!selectedVacancy || analyzing}
               >
-                {analyzing ? "Анализирую..." : "Проанализировать заново"}
+                {analyzing ? "Проверяю..." : "Проверить совпадение"}
               </button>
             </div>
           </div>
@@ -457,9 +587,13 @@ function ManualVacanciesPage() {
         </div>
       </section>
 
-      {detailsOpen && selectedVacancy && detailsForm ? (
-        <div className="modalBackdrop" role="presentation">
-          <div className="modalPanel" role="dialog" aria-modal="true">
+      {detailsOpen && selectedVacancy ? (
+        <div
+          className="modalBackdrop"
+          role="presentation"
+          onMouseDown={(event) => closeOnBackdropMouseDown(event, closeDetails)}
+        >
+          <div className="modalPanel detailsModalPanel" role="dialog" aria-modal="true">
             <div className="modalHeader">
               <div>
                 <div className="eyebrow">Детали вакансии</div>
@@ -470,12 +604,121 @@ function ManualVacanciesPage() {
               </button>
             </div>
 
+            <div className="detailGrid">
+              <div>
+                <span className="detailLabel">hh id</span>
+                <div>{selectedVacancy.hhId || "-"}</div>
+              </div>
+              <div>
+                <span className="detailLabel">Компания</span>
+                <div>{selectedVacancy.company}</div>
+              </div>
+              <div>
+                <span className="detailLabel">Статус</span>
+                <div>{STATUS_LABELS[selectedVacancy.status]}</div>
+              </div>
+              <div>
+                <span className="detailLabel">Зарплата</span>
+                <div>{selectedVacancy.salary || "-"}</div>
+              </div>
+              <div>
+                <span className="detailLabel">Оценка зарплаты</span>
+                <div>{selectedVacancy.estimatedSalary || "-"}</div>
+              </div>
+              <div>
+                <span className="detailLabel">Формат</span>
+                <div>{formatList(selectedVacancy.formats)}</div>
+              </div>
+              <div>
+                <span className="detailLabel">Локация</span>
+                <div>{selectedVacancy.location}</div>
+              </div>
+              <div>
+                <span className="detailLabel">Грейд</span>
+                <div>{selectedVacancy.grade}</div>
+              </div>
+              <div>
+                <span className="detailLabel">Анализ</span>
+                <div>{formatDate(selectedVacancy.analyzedAt)}</div>
+              </div>
+              <div>
+                <span className="detailLabel">Создана</span>
+                <div>{formatDate(selectedVacancy.createdAt)}</div>
+              </div>
+              <div>
+                <span className="detailLabel">Обновлена</span>
+                <div>{formatDate(selectedVacancy.updatedAt)}</div>
+              </div>
+              <div>
+                <span className="detailLabel">Совпадение</span>
+                <div>{selectedVacancy.matchPercent ?? "-"}%</div>
+              </div>
+            </div>
+
+            <div className="detailBlock">
+              <span className="detailLabel">Стек</span>
+              <div className="tagRow">
+                {selectedVacancy.stack.length > 0
+                  ? selectedVacancy.stack.map((item) => (
+                      <span className="detailTag" key={item}>
+                        {item}
+                      </span>
+                    ))
+                  : "-"}
+              </div>
+            </div>
+            <div className="detailBlock">
+              <span className="detailLabel">Задачи</span>
+              <DetailList items={selectedVacancy.tasks} />
+            </div>
+            <div className="detailBlock">
+              <span className="detailLabel">Требования</span>
+              <DetailList items={selectedVacancy.requirements} />
+            </div>
+            <div className="detailBlock">
+              <span className="detailLabel">Будет плюсом</span>
+              <DetailList items={selectedVacancy.niceToHave} />
+            </div>
+            <div className="detailBlock">
+              <span className="detailLabel">Красные флаги</span>
+              <DetailList items={selectedVacancy.redFlags} />
+            </div>
+            <div className="modalActions">
+              <button
+                className="secondaryButton"
+                type="button"
+                onClick={closeDetails}
+              >
+                Закрыть
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {editOpen && selectedVacancy && editForm ? (
+        <div
+          className="modalBackdrop"
+          role="presentation"
+          onMouseDown={(event) => closeOnBackdropMouseDown(event, closeEdit)}
+        >
+          <div className="modalPanel detailsModalPanel editModalPanel" role="dialog" aria-modal="true">
+            <div className="modalHeader">
+              <div>
+                <div className="eyebrow">Редактирование вакансии</div>
+                <h2>{selectedVacancy.title}</h2>
+              </div>
+              <button className="iconButton" type="button" onClick={closeEdit}>
+                x
+              </button>
+            </div>
+
             <label className="fieldGroup">
               <span className="detailLabel">Текст вакансии</span>
               <textarea
-                value={detailsForm.rawText}
+                value={editForm.rawText}
                 onChange={(event) =>
-                  updateDetailsField("rawText", event.target.value)
+                  updateEditField("rawText", event.target.value)
                 }
                 rows={18}
               />
@@ -485,30 +728,30 @@ function ManualVacanciesPage() {
               <button
                 className="secondaryButton"
                 type="button"
-                onClick={closeDetails}
-                disabled={detailsSaving || analyzing}
+                onClick={closeEdit}
+                disabled={editSaving || analyzing}
               >
                 Отмена
               </button>
               <button
                 className="secondaryButton"
                 type="button"
-                onClick={handleSaveDetails}
-                disabled={detailsSaving || analyzing}
+                onClick={handleSaveEdit}
+                disabled={editSaving || analyzing}
               >
-                {detailsSaving ? "Сохраняю..." : "Сохранить"}
+                {editSaving ? "Сохраняю..." : "Сохранить"}
               </button>
               <button
                 className="primaryButton"
                 type="button"
-                onClick={handleSaveAndAnalyzeDetails}
-                disabled={detailsSaving || analyzing}
+                onClick={handleSaveAndAnalyzeEdit}
+                disabled={editSaving || analyzing}
               >
                 {analyzing
                   ? "Анализирую..."
-                  : detailsSaving
+                  : editSaving
                     ? "Сохраняю..."
-                  : "Сохранить и проанализировать"}
+                  : "Сохранить и проверить совпадение"}
               </button>
             </div>
           </div>

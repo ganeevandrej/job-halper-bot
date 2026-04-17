@@ -2,6 +2,7 @@ import { randomUUID } from "crypto";
 import {
   createManualVacancy,
   getManualVacancyById,
+  hasManualVacancyWithHhId,
   listManualVacancies,
   saveManualVacancyAnalysis,
   updateManualVacancy,
@@ -15,6 +16,25 @@ import { analyzeVacancy } from "./analysisService";
 import { extractManualVacancyFields } from "./manualVacancyExtractionService";
 
 const FALLBACK_VALUE = "Unknown";
+
+interface CreateManualVacancyOptions {
+  salaryOverride?: string;
+  hhId?: string;
+  url?: string;
+  company?: string;
+}
+
+export class ManualVacancyDuplicateHhIdError extends Error {
+  constructor(readonly hhId: string) {
+    super(`Manual vacancy with hhId ${hhId} already exists`);
+    this.name = "ManualVacancyDuplicateHhIdError";
+  }
+}
+
+const buildHhVacancyUrl = (hhId?: string): string | null => {
+  const normalized = hhId?.trim();
+  return normalized ? `https://hh.ru/vacancy/${normalized}` : null;
+};
 
 const buildDescriptionForAnalysis = (
   vacancy: ManualVacancyRecord,
@@ -54,20 +74,30 @@ const buildVacancyDetails = (vacancy: ManualVacancyRecord): VacancyDetails => ({
   company: vacancy.company,
   salary: vacancy.salary ?? "Not specified",
   description: buildDescriptionForAnalysis(vacancy),
-  url: "",
+  url: vacancy.url ?? "",
 });
 
-export const createAndAnalyzeManualVacancy = async (
+export const createManualVacancyFromText = async (
   rawText: string,
-  salaryOverride?: string,
+  options: CreateManualVacancyOptions = {},
 ): Promise<ManualVacancyRecord> => {
+  const hhId = options.hhId?.trim();
+
+  if (hhId && await hasManualVacancyWithHhId(hhId)) {
+    throw new ManualVacancyDuplicateHhIdError(hhId);
+  }
+
   const now = new Date().toISOString();
-  const parsed = await extractManualVacancyFields(rawText, salaryOverride);
-  const initialRecord: ManualVacancyRecord = {
+  const parsed = await extractManualVacancyFields(rawText, options.salaryOverride);
+  const company = options.company?.trim() || parsed.company;
+  const record: ManualVacancyRecord = {
     id: randomUUID(),
+    hhId: hhId || null,
+    url: options.url?.trim() || buildHhVacancyUrl(hhId),
     rawText,
     status: "new",
     ...parsed,
+    company,
     matchPercent: null,
     decision: null,
     reason: null,
@@ -78,22 +108,22 @@ export const createAndAnalyzeManualVacancy = async (
     analyzedAt: null,
   };
 
-  const analysis = await analyzeVacancy(buildVacancyDetails(initialRecord));
-  const analyzedAt = new Date().toISOString();
-  const record: ManualVacancyRecord = {
-    ...initialRecord,
-    estimatedSalary: analysis.salary_estimate,
-    matchPercent: analysis.match_percent,
-    decision: analysis.decision,
-    reason: analysis.reason,
-    salaryEstimate: analysis.salary_estimate,
-    coverLetter: analysis.cover_letter,
-    updatedAt: analyzedAt,
-    analyzedAt,
-  };
-
   await createManualVacancy(record);
   return record;
+};
+
+export const createAndAnalyzeManualVacancy = async (
+  rawText: string,
+  options: CreateManualVacancyOptions = {},
+): Promise<ManualVacancyRecord> => {
+  const record = await createManualVacancyFromText(rawText, options);
+  const analyzed = await analyzeManualVacancyById(record.id);
+
+  if (!analyzed) {
+    throw new Error("Created manual vacancy was not found for analysis");
+  }
+
+  return analyzed;
 };
 
 export const getManualVacancies = async (
@@ -145,16 +175,7 @@ export const analyzeManualVacancyById = async (
     return null;
   }
 
-  const parsed = await extractManualVacancyFields(vacancy.rawText);
-  await updateManualVacancy(id, parsed);
-
-  const updatedVacancy = await getManualVacancyById(id);
-
-  if (!updatedVacancy) {
-    return null;
-  }
-
-  const analysis = await analyzeVacancy(buildVacancyDetails(updatedVacancy));
+  const analysis = await analyzeVacancy(buildVacancyDetails(vacancy));
   await saveManualVacancyAnalysis(id, {
     matchPercent: analysis.match_percent,
     decision: analysis.decision,

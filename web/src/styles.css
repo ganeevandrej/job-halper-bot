@@ -360,11 +360,11 @@ h2 {
   background: #efe0bf;
 }
 
-.status-rejected {
+.status-not_fit {
   background: #f3d6d2;
 }
 
-.status-viewed {
+.status-analyzed {
   background: #dde7f5;
 }
 
@@ -372,7 +372,7 @@ h2 {
   background: #d6f0ea;
 }
 
-.status-hidden {
+.status-archived {
   background: #ececec;
 }
 
@@ -408,6 +408,41 @@ select {
   gap: 18px;
 }
 
+.detailsPanel .detailsContent > .detailBlock:first-child,
+.profileLayout .panel,
+.editModalPanel .fieldGroup {
+  border: 1px solid rgba(19, 32, 24, 0.08);
+  border-radius: 8px;
+  background: #fffdf8;
+}
+
+.detailsPanel .detailsContent > .detailBlock:first-child {
+  padding: 14px;
+  background: #f8fbf5;
+}
+
+.detailsPanel .detailGrid {
+  margin-bottom: 2px;
+}
+
+.detailsPanel .detailGrid > div {
+  min-width: 0;
+  border: 1px solid rgba(19, 32, 24, 0.08);
+  border-radius: 8px;
+  padding: 11px 12px;
+  background: #f8fbf5;
+}
+
+.detailsPanel .detailGrid > div > div {
+  margin-top: 5px;
+  overflow-wrap: anywhere;
+}
+
+.detailsPanel .detailsContent > .detailBlock:not(:first-child) {
+  border-top: 1px solid rgba(19, 32, 24, 0.08);
+  padding-top: 14px;
+}
+
 .detailsActions {
   display: flex;
   flex-wrap: wrap;
@@ -438,6 +473,103 @@ select {
   box-shadow: 0 20px 60px rgba(19, 32, 24, 0.18);
 }
 
+.detailsModalPanel {
+  padding: 18px;
+}
+
+.detailsModalPanel .modalHeader {
+  position: sticky;
+  top: -18px;
+  z-index: 1;
+  margin: -18px -18px 16px;
+  padding: 18px;
+  border-bottom: 1px solid rgba(19, 32, 24, 0.08);
+  background: rgba(255, 253, 248, 0.96);
+  backdrop-filter: blur(10px);
+}
+
+.detailsModalPanel .detailGrid {
+  margin-bottom: 18px;
+}
+
+.detailsModalPanel .detailGrid > div {
+  min-width: 0;
+  border: 1px solid rgba(19, 32, 24, 0.08);
+  border-radius: 8px;
+  padding: 11px 12px;
+  background: #f8fbf5;
+}
+
+.detailsModalPanel .detailGrid > div > div {
+  margin-top: 5px;
+  overflow-wrap: anywhere;
+}
+
+.detailsModalPanel .detailBlock {
+  border-top: 1px solid rgba(19, 32, 24, 0.08);
+  padding-top: 14px;
+  margin-top: 14px;
+}
+
+.editModalPanel .fieldGroup {
+  padding: 12px;
+  background: #f8fbf5;
+}
+
+.editModalPanel textarea {
+  min-height: 420px;
+}
+
+.profileLayout .panel {
+  padding: 18px;
+}
+
+.profileLayout .fieldGroup,
+.profileLayout .checkboxField {
+  min-width: 0;
+  border: 1px solid rgba(19, 32, 24, 0.08);
+  border-radius: 8px;
+  padding: 11px 12px;
+  background: #f8fbf5;
+}
+
+.profileLayout .fieldGroup textarea,
+.profileLayout .fieldGroup input,
+.profileLayout .tagList {
+  background: #fffdf8;
+}
+
+.profileLayout .panelHeader {
+  border-bottom: 1px solid rgba(19, 32, 24, 0.08);
+  padding-bottom: 12px;
+}
+
+.tagRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.detailTag {
+  border: 1px solid rgba(19, 32, 24, 0.1);
+  border-radius: 8px;
+  padding: 6px 8px;
+  color: #132018;
+  background: #eef7f1;
+  font-size: 13px;
+}
+
+.detailList {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 20px;
+}
+
+.detailList li {
+  padding-left: 2px;
+}
+
 .modalHeader,
 .modalActions {
   display: flex;
@@ -464,8 +596,20 @@ select {
   cursor: pointer;
 }
 
+.linkButton {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+
 .secondaryButton:disabled {
   opacity: 0.55;
+  cursor: default;
+}
+
+.secondaryButton.disabled {
+  opacity: 0.55;
+  pointer-events: none;
   cursor: default;
 }
 

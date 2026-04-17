@@ -29,10 +29,10 @@ const fetchJson = async <T>(path: string, init?: RequestInit): Promise<T> => {
   return (await response.json()) as T;
 };
 
-export const createAndAnalyzeManualVacancy = async (
+export const createManualVacancy = async (
   request: CreateManualVacancyRequest,
 ): Promise<ManualVacancy> =>
-  fetchJson<ManualVacancy>("/manual-vacancies/analyze", {
+  fetchJson<ManualVacancy>("/manual-vacancies", {
     method: "POST",
     body: JSON.stringify(request),
   });

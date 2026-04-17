@@ -15,8 +15,10 @@ import { VacancyStatus } from "./types";
 import {
   analyzeManualVacancyById,
   createAndAnalyzeManualVacancy,
+  createManualVacancyFromText,
   getManualVacancies,
   getManualVacancy,
+  ManualVacancyDuplicateHhIdError,
   updateManualVacancyById,
 } from "./services/manualVacancyService";
 import {
@@ -41,10 +43,10 @@ const ALLOWED_STATUSES: VacancyStatus[] = [
 
 const ALLOWED_MANUAL_VACANCY_STATUSES: ManualVacancyStatus[] = [
   "new",
-  "viewed",
-  "rejected",
+  "analyzed",
   "applied",
-  "hidden",
+  "not_fit",
+  "archived",
 ];
 
 const parseStatus = (value: unknown): VacancyStatus | undefined => {
@@ -160,6 +162,8 @@ const parseManualVacancyUpdate = (body: unknown): UpdateManualVacancyInput => {
   const input: UpdateManualVacancyInput = {};
   const status = parseManualVacancyStatus(payload.status);
   const rawText = parseOptionalRequiredString(payload.rawText);
+  const hhId = parseOptionalString(payload.hhId);
+  const url = parseOptionalString(payload.url);
   const title = parseOptionalRequiredString(payload.title);
   const company = parseOptionalRequiredString(payload.company);
   const salary = parseOptionalString(payload.salary);
@@ -176,6 +180,8 @@ const parseManualVacancyUpdate = (body: unknown): UpdateManualVacancyInput => {
 
   if (status) input.status = status;
   if (rawText !== undefined) input.rawText = rawText;
+  if (hhId !== undefined) input.hhId = hhId;
+  if (url !== undefined) input.url = url;
   if (title !== undefined) input.title = title;
   if (company !== undefined) input.company = company;
   if (salary !== undefined) input.salary = salary;
@@ -305,6 +311,57 @@ export const createApp = () => {
     response.json(vacancy);
   });
 
+  app.post("/manual-vacancies", async (request: Request, response: Response) => {
+    const rawText = request.body?.rawText;
+
+    if (typeof rawText !== "string" || rawText.trim().length < 20) {
+      response.status(400).json({
+        error: "Vacancy text must be at least 20 characters long",
+      });
+      return;
+    }
+
+    const salaryOverride =
+      typeof request.body?.salaryOverride === "string"
+        ? request.body.salaryOverride
+        : undefined;
+    const hhId =
+      typeof request.body?.hhId === "string"
+        ? request.body.hhId.trim()
+        : undefined;
+    const url =
+      typeof request.body?.url === "string"
+        ? request.body.url.trim()
+        : undefined;
+    const company =
+      typeof request.body?.company === "string"
+        ? request.body.company.trim()
+        : undefined;
+
+    try {
+      const vacancy = await createManualVacancyFromText(
+        rawText.trim(),
+        {
+          salaryOverride: salaryOverride?.trim() || undefined,
+          hhId: hhId || undefined,
+          url: url || undefined,
+          company: company || undefined,
+        },
+      );
+
+      response.status(201).json(vacancy);
+    } catch (error) {
+      if (error instanceof ManualVacancyDuplicateHhIdError) {
+        response.status(409).json({
+          error: `Vacancy with hhId ${error.hhId} already exists`,
+        });
+        return;
+      }
+
+      throw error;
+    }
+  });
+
   app.post("/manual-vacancies/analyze", async (request: Request, response: Response) => {
     const rawText = request.body?.rawText;
 
@@ -319,12 +376,40 @@ export const createApp = () => {
       typeof request.body?.salaryOverride === "string"
         ? request.body.salaryOverride
         : undefined;
-    const vacancy = await createAndAnalyzeManualVacancy(
-      rawText.trim(),
-      salaryOverride?.trim() || undefined,
-    );
+    const hhId =
+      typeof request.body?.hhId === "string"
+        ? request.body.hhId.trim()
+        : undefined;
+    const url =
+      typeof request.body?.url === "string"
+        ? request.body.url.trim()
+        : undefined;
+    const company =
+      typeof request.body?.company === "string"
+        ? request.body.company.trim()
+        : undefined;
+    try {
+      const vacancy = await createAndAnalyzeManualVacancy(
+        rawText.trim(),
+        {
+          salaryOverride: salaryOverride?.trim() || undefined,
+          hhId: hhId || undefined,
+          url: url || undefined,
+          company: company || undefined,
+        },
+      );
 
-    response.json(vacancy);
+      response.json(vacancy);
+    } catch (error) {
+      if (error instanceof ManualVacancyDuplicateHhIdError) {
+        response.status(409).json({
+          error: `Vacancy with hhId ${error.hhId} already exists`,
+        });
+        return;
+      }
+
+      throw error;
+    }
   });
 
   app.patch("/manual-vacancies/:id", async (request: Request, response: Response) => {

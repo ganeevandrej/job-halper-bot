@@ -42,12 +42,24 @@ const mapDecision = (value: unknown): "yes" | "no" | null => {
 const mapStatus = (value: unknown): ManualVacancyStatus => {
   if (
     value === "new" ||
-    value === "viewed" ||
-    value === "rejected" ||
+    value === "analyzed" ||
     value === "applied" ||
-    value === "hidden"
+    value === "not_fit" ||
+    value === "archived"
   ) {
     return value;
+  }
+
+  if (value === "viewed") {
+    return "new";
+  }
+
+  if (value === "rejected") {
+    return "not_fit";
+  }
+
+  if (value === "hidden") {
+    return "archived";
   }
 
   return "new";
@@ -57,6 +69,8 @@ const mapRowToManualVacancy = (
   row: Record<string, unknown>,
 ): ManualVacancyRecord => ({
   id: String(row.id),
+  hhId: typeof row.hh_id === "string" && row.hh_id ? row.hh_id : null,
+  url: typeof row.url === "string" && row.url ? row.url : null,
   rawText: String(row.raw_text),
   status: mapStatus(row.status),
   title: String(row.title),
@@ -100,14 +114,16 @@ export const createManualVacancy = async (
   db.run(
     `
       INSERT INTO manual_vacancies (
-        id, raw_text, status, title, company, salary, estimated_salary, format, formats_json,
+        id, hh_id, url, raw_text, status, title, company, salary, estimated_salary, format, formats_json,
         location, grade, stack_json, tasks_json, requirements_json, nice_to_have_json,
         red_flags_json, summary, match_percent, decision, reason,
         salary_estimate, cover_letter, created_at, updated_at, analyzed_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       vacancy.id,
+      vacancy.hhId,
+      vacancy.url,
       vacancy.rawText,
       vacancy.status,
       vacancy.title,
@@ -138,6 +154,28 @@ export const createManualVacancy = async (
   await persistManualVacancyDatabase();
 };
 
+export const hasManualVacancyWithHhId = async (
+  hhId: string,
+): Promise<boolean> => {
+  const normalized = hhId.trim();
+
+  if (!normalized) {
+    return false;
+  }
+
+  const { db } = await getManualVacancyDatabase();
+  const statement = db.prepare(
+    "SELECT 1 FROM manual_vacancies WHERE hh_id = ? LIMIT 1",
+  );
+
+  try {
+    statement.bind([normalized]);
+    return statement.step();
+  } finally {
+    statement.free();
+  }
+};
+
 export const listManualVacancies = async (
   filters: Partial<ManualVacancyListFilters> = {},
 ): Promise<{ items: ManualVacancyRecord[]; total: number }> => {
@@ -149,8 +187,8 @@ export const listManualVacancies = async (
     "SELECT COUNT(*) AS total FROM manual_vacancies",
   );
   const itemsStatement = db.prepare(`
-    SELECT
-      id, raw_text, status, title, company, salary, estimated_salary, format, formats_json,
+      SELECT
+      id, hh_id, url, raw_text, status, title, company, salary, estimated_salary, format, formats_json,
       location, grade, stack_json, tasks_json, requirements_json, nice_to_have_json,
       red_flags_json, summary, match_percent, decision, reason,
       salary_estimate, cover_letter, created_at, updated_at, analyzed_at
@@ -183,8 +221,8 @@ export const getManualVacancyById = async (
 ): Promise<ManualVacancyRecord | null> => {
   const { db } = await getManualVacancyDatabase();
   const statement = db.prepare(`
-    SELECT
-      id, raw_text, status, title, company, salary, estimated_salary, format, formats_json,
+      SELECT
+      id, hh_id, url, raw_text, status, title, company, salary, estimated_salary, format, formats_json,
       location, grade, stack_json, tasks_json, requirements_json, nice_to_have_json,
       red_flags_json, summary, match_percent, decision, reason,
       salary_estimate, cover_letter, created_at, updated_at, analyzed_at
@@ -227,6 +265,8 @@ export const updateManualVacancy = async (
     `
       UPDATE manual_vacancies
       SET
+        hh_id = ?,
+        url = ?,
         raw_text = ?,
         status = ?,
         title = ?,
@@ -247,6 +287,8 @@ export const updateManualVacancy = async (
       WHERE id = ?
     `,
     [
+      next.hhId,
+      next.url,
       next.rawText,
       next.status,
       next.title,
@@ -294,6 +336,10 @@ export const saveManualVacancyAnalysis = async (
         estimated_salary = ?,
         salary_estimate = ?,
         cover_letter = ?,
+        status = CASE
+          WHEN status IN ('applied', 'not_fit', 'archived') THEN status
+          ELSE 'analyzed'
+        END,
         analyzed_at = ?,
         updated_at = ?
       WHERE id = ?
