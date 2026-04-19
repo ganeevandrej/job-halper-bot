@@ -5,17 +5,19 @@ import {
   hasManualVacancyWithHhId,
   listManualVacancies,
   saveManualVacancyAnalysis,
+  saveManualVacancyCoverLetter,
   updateManualVacancy,
 } from "../storage/manualVacancyRepository";
-import { VacancyDetails } from "../types";
 import {
   ManualVacancyRecord,
+  ManualVacancyStatus,
   UpdateManualVacancyInput,
 } from "../types/manualVacancy";
-import { analyzeVacancy } from "./analysisService";
+import {
+  analyzeVacancyFit,
+  generateVacancyCoverLetter,
+} from "./analysisService";
 import { extractManualVacancyFields } from "./manualVacancyExtractionService";
-
-const FALLBACK_VALUE = "Unknown";
 
 interface CreateManualVacancyOptions {
   salaryOverride?: string;
@@ -26,7 +28,7 @@ interface CreateManualVacancyOptions {
 
 export class ManualVacancyDuplicateHhIdError extends Error {
   constructor(readonly hhId: string) {
-    super(`Manual vacancy with hhId ${hhId} already exists`);
+    super(`Вакансия с hh id ${hhId} уже есть в списке`);
     this.name = "ManualVacancyDuplicateHhIdError";
   }
 }
@@ -35,47 +37,6 @@ const buildHhVacancyUrl = (hhId?: string): string | null => {
   const normalized = hhId?.trim();
   return normalized ? `https://hh.ru/vacancy/${normalized}` : null;
 };
-
-const buildDescriptionForAnalysis = (
-  vacancy: ManualVacancyRecord,
-): string => [
-  vacancy.summary,
-  "",
-  "Stated salary:",
-  vacancy.salary ?? FALLBACK_VALUE,
-  "",
-  "Estimated salary:",
-  vacancy.estimatedSalary ?? FALLBACK_VALUE,
-  "",
-  "Formats:",
-  vacancy.formats.join(", ") || FALLBACK_VALUE,
-  "",
-  "Stack:",
-  vacancy.stack.join(", ") || FALLBACK_VALUE,
-  "",
-  "Tasks:",
-  vacancy.tasks.map((item) => `- ${item}`).join("\n") || FALLBACK_VALUE,
-  "",
-  "Requirements:",
-  vacancy.requirements.map((item) => `- ${item}`).join("\n") || FALLBACK_VALUE,
-  "",
-  "Nice to have:",
-  vacancy.niceToHave.map((item) => `- ${item}`).join("\n") || FALLBACK_VALUE,
-  "",
-  "Red flags:",
-  vacancy.redFlags.map((item) => `- ${item}`).join("\n") || FALLBACK_VALUE,
-  "",
-  "Raw vacancy text:",
-  vacancy.rawText,
-].join("\n");
-
-const buildVacancyDetails = (vacancy: ManualVacancyRecord): VacancyDetails => ({
-  title: vacancy.title,
-  company: vacancy.company,
-  salary: vacancy.salary ?? "Not specified",
-  description: buildDescriptionForAnalysis(vacancy),
-  url: vacancy.url ?? "",
-});
 
 export const createManualVacancyFromText = async (
   rawText: string,
@@ -109,26 +70,27 @@ export const createManualVacancyFromText = async (
   };
 
   await createManualVacancy(record);
-  return record;
+  const analyzed = await analyzeManualVacancyById(record.id);
+
+  if (!analyzed) {
+    throw new Error("Вакансия добавлена, но не найдена для анализа");
+  }
+
+  return analyzed;
 };
 
 export const createAndAnalyzeManualVacancy = async (
   rawText: string,
   options: CreateManualVacancyOptions = {},
 ): Promise<ManualVacancyRecord> => {
-  const record = await createManualVacancyFromText(rawText, options);
-  const analyzed = await analyzeManualVacancyById(record.id);
-
-  if (!analyzed) {
-    throw new Error("Created manual vacancy was not found for analysis");
-  }
-
-  return analyzed;
+  return createManualVacancyFromText(rawText, options);
 };
 
 export const getManualVacancies = async (
   page: number,
   pageSize: number,
+  hhId?: string,
+  status?: ManualVacancyStatus,
 ): Promise<{
   items: ManualVacancyRecord[];
   total: number;
@@ -138,7 +100,7 @@ export const getManualVacancies = async (
   const limit = Math.max(1, Math.min(pageSize, 100));
   const safePage = Math.max(1, page);
   const offset = (safePage - 1) * limit;
-  const result = await listManualVacancies({ limit, offset });
+  const result = await listManualVacancies({ limit, offset, hhId, status });
 
   return {
     items: result.items,
@@ -175,14 +137,47 @@ export const analyzeManualVacancyById = async (
     return null;
   }
 
-  const analysis = await analyzeVacancy(buildVacancyDetails(vacancy));
+  const analysis = await analyzeVacancyFit(vacancy.rawText);
   await saveManualVacancyAnalysis(id, {
     matchPercent: analysis.match_percent,
     decision: analysis.decision,
     reason: analysis.reason,
     salaryEstimate: analysis.salary_estimate,
-    coverLetter: analysis.cover_letter,
   });
+
+  return getManualVacancyById(id);
+};
+
+export const generateManualVacancyCoverLetterById = async (
+  id: string,
+): Promise<ManualVacancyRecord | null> => {
+  let vacancy = await getManualVacancyById(id);
+
+  if (!vacancy) {
+    return null;
+  }
+
+  if (
+    vacancy.matchPercent === null ||
+    !vacancy.decision ||
+    !vacancy.reason ||
+    !vacancy.salaryEstimate
+  ) {
+    vacancy = await analyzeManualVacancyById(id);
+  }
+
+  if (!vacancy) {
+    return null;
+  }
+
+  const coverLetter = await generateVacancyCoverLetter(vacancy.rawText, {
+    match_percent: vacancy.matchPercent ?? 0,
+    decision: vacancy.decision ?? "no",
+    reason: vacancy.reason ?? "",
+    salary_estimate: vacancy.salaryEstimate ?? vacancy.estimatedSalary ?? "",
+  });
+
+  await saveManualVacancyCoverLetter(id, coverLetter.cover_letter);
 
   return getManualVacancyById(id);
 };

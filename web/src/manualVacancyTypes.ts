@@ -41,6 +41,25 @@ export interface ManualVacancyListResponse {
   pageSize: number;
 }
 
+export interface ManualVacancyStats {
+  total: number;
+  new: number;
+  analyzed: number;
+  applied: number;
+  notFit: number;
+  archived: number;
+  withMatch: number;
+  averageMatchPercent: number | null;
+  salaryBuckets: ManualVacancyStatsBucket[];
+  formatDistribution: ManualVacancyStatsBucket[];
+  gradeDistribution: ManualVacancyStatsBucket[];
+}
+
+export interface ManualVacancyStatsBucket {
+  label: string;
+  count: number;
+}
+
 export interface CreateManualVacancyRequest {
   rawText: string;
   salaryOverride?: string;

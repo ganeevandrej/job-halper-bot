@@ -43,6 +43,29 @@ const initSchema = (db: Database): void => {
       updated_at TEXT NOT NULL
     );
   `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS competitor_resumes (
+      id TEXT PRIMARY KEY,
+      hh_id TEXT,
+      raw_text TEXT NOT NULL,
+      has_photo INTEGER NOT NULL DEFAULT 0,
+      title TEXT NOT NULL,
+      total_experience_months INTEGER,
+      relevant_experience_months INTEGER,
+      irrelevant_experience_months INTEGER,
+      relevant_experience_summary TEXT NOT NULL,
+      salary_expectation TEXT,
+      key_skills_json TEXT NOT NULL,
+      strengths_json TEXT NOT NULL,
+      weaknesses_json TEXT NOT NULL,
+      is_better_than_mine INTEGER NOT NULL DEFAULT 0,
+      comparison_score INTEGER NOT NULL,
+      comparison_reason TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+  `);
 };
 
 const createContext = async (): Promise<ProfileDatabaseContext> => {

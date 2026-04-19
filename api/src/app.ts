@@ -3,19 +3,11 @@ import express, {
   Request,
   Response,
 } from "express";
-import { collectSearchQueue } from "./services/searchService";
-import {
-  analyzeVacancyById,
-  getVacancies,
-  getVacancy,
-  setVacancyStatus,
-} from "./services/vacancyService";
-import { getVacancyStats } from "./storage/vacancyRepository";
-import { VacancyStatus } from "./types";
 import {
   analyzeManualVacancyById,
   createAndAnalyzeManualVacancy,
   createManualVacancyFromText,
+  generateManualVacancyCoverLetterById,
   getManualVacancies,
   getManualVacancy,
   ManualVacancyDuplicateHhIdError,
@@ -32,14 +24,16 @@ import {
   getCandidateProfile,
   updateCandidateProfile,
 } from "./storage/profileRepository";
-
-const ALLOWED_STATUSES: VacancyStatus[] = [
-  "new",
-  "viewed",
-  "rejected",
-  "applied",
-  "hidden",
-];
+import { getManualVacancyStats } from "./storage/manualVacancyRepository";
+import {
+  CompetitorResumeDuplicateHhIdError,
+  createCompetitorResume,
+} from "./services/competitorResumeService";
+import {
+  getCompetitorResumeById,
+  getCompetitorResumeStats,
+  listCompetitorResumes,
+} from "./storage/competitorResumeRepository";
 
 const ALLOWED_MANUAL_VACANCY_STATUSES: ManualVacancyStatus[] = [
   "new",
@@ -48,28 +42,6 @@ const ALLOWED_MANUAL_VACANCY_STATUSES: ManualVacancyStatus[] = [
   "not_fit",
   "archived",
 ];
-
-const parseStatus = (value: unknown): VacancyStatus | undefined => {
-  if (typeof value !== "string") {
-    return undefined;
-  }
-
-  return ALLOWED_STATUSES.includes(value as VacancyStatus)
-    ? (value as VacancyStatus)
-    : undefined;
-};
-
-const parseStatuses = (value: unknown): VacancyStatus[] => {
-  const values = Array.isArray(value)
-    ? value
-    : typeof value === "string"
-      ? value.split(",")
-      : [];
-
-  return values
-    .map((item) => parseStatus(item))
-    .filter((item): item is VacancyStatus => Boolean(item));
-};
 
 const parseManualVacancyStatus = (
   value: unknown,
@@ -235,10 +207,6 @@ export const createApp = () => {
     response.json({ ok: true });
   });
 
-  app.get("/stats", async (_: Request, response: Response) => {
-    response.json(await getVacancyStats());
-  });
-
   app.get("/profile", async (_: Request, response: Response) => {
     response.json(await getCandidateProfile());
   });
@@ -248,7 +216,7 @@ export const createApp = () => {
 
     if (!input) {
       response.status(400).json({
-        error: "Valid profile payload is required",
+        error: "Заполни обязательные поля профиля",
       });
       return;
     }
@@ -256,55 +224,102 @@ export const createApp = () => {
     response.json(await updateCandidateProfile(input));
   });
 
-  app.get("/vacancies", async (request: Request, response: Response) => {
+  app.post("/competitor-resumes", async (request: Request, response: Response) => {
+    const rawText = request.body?.rawText;
+
+    if (typeof rawText !== "string" || rawText.trim().length < 50) {
+      response.status(400).json({
+        error: "Описание резюме должно быть не короче 50 символов",
+      });
+      return;
+    }
+
+    const hhId = typeof request.body?.hhId === "string"
+      ? request.body.hhId.trim()
+      : undefined;
+
+    try {
+      const resume = await createCompetitorResume({
+        rawText: rawText.trim(),
+        hhId: hhId || undefined,
+        hasPhoto: Boolean(request.body?.hasPhoto),
+      });
+
+      response.status(201).json(resume);
+    } catch (error) {
+      if (error instanceof CompetitorResumeDuplicateHhIdError) {
+        response.status(409).json({
+          error: `Резюме с hh id ${error.hhId} уже есть в базе`,
+        });
+        return;
+      }
+
+      throw error;
+    }
+  });
+
+  app.get("/competitor-resumes", async (request: Request, response: Response) => {
     const page = Number(getSingleValue(request.query.page) || 1);
     const pageSize = Number(getSingleValue(request.query.pageSize) || 20);
-    const statuses = parseStatuses(request.query.status);
-    const result = await getVacancies(page, pageSize, statuses);
-    response.json(result);
+    const limit = Math.max(1, Math.min(pageSize, 100));
+    const safePage = Math.max(1, page);
+    const offset = (safePage - 1) * limit;
+    const result = await listCompetitorResumes({ limit, offset });
+
+    response.json({
+      ...result,
+      page: safePage,
+      pageSize: limit,
+    });
   });
 
-  app.get("/vacancies/:id", async (request: Request, response: Response) => {
-    const vacancyId = getSingleValue(request.params.id);
+  app.get("/competitor-resumes/stats", async (_: Request, response: Response) => {
+    response.json(await getCompetitorResumeStats());
+  });
 
-    if (!vacancyId) {
-      response.status(400).json({ error: "Vacancy id is required" });
+  app.get("/competitor-resumes/:id", async (request: Request, response: Response) => {
+    const resumeId = getSingleValue(request.params.id);
+
+    if (!resumeId) {
+      response.status(400).json({ error: "Не передан id резюме" });
       return;
     }
 
-    const vacancy = await getVacancy(vacancyId);
+    const resume = await getCompetitorResumeById(resumeId);
 
-    if (!vacancy) {
-      response.status(404).json({ error: "Vacancy not found" });
+    if (!resume) {
+      response.status(404).json({ error: "Резюме не найдено" });
       return;
     }
 
-    response.json(vacancy);
-  });
-
-  app.post("/search/run", async (_: Request, response: Response) => {
-    response.json(await collectSearchQueue());
+    response.json(resume);
   });
 
   app.get("/manual-vacancies", async (request: Request, response: Response) => {
     const page = Number(getSingleValue(request.query.page) || 1);
     const pageSize = Number(getSingleValue(request.query.pageSize) || 20);
-    const result = await getManualVacancies(page, pageSize);
+    const hhId = getSingleValue(request.query.hhId)?.trim();
+    const status = parseManualVacancyStatus(getSingleValue(request.query.status));
+    const result = await getManualVacancies(page, pageSize, hhId, status);
     response.json(result);
+  });
+
+  app.get("/manual-vacancies/stats", async (_: Request, response: Response) => {
+    response.json(await getManualVacancyStats());
   });
 
   app.get("/manual-vacancies/:id", async (request: Request, response: Response) => {
     const vacancyId = getSingleValue(request.params.id);
 
     if (!vacancyId) {
-      response.status(400).json({ error: "Manual vacancy id is required" });
+      response.status(400).json({ error: "Не передан id вакансии" });
       return;
     }
 
     const vacancy = await getManualVacancy(vacancyId);
 
     if (!vacancy) {
-      response.status(404).json({ error: "Manual vacancy not found" });
+      response.status(404).json({ error: "Вакансия не найдена" });
       return;
     }
 
@@ -316,7 +331,7 @@ export const createApp = () => {
 
     if (typeof rawText !== "string" || rawText.trim().length < 20) {
       response.status(400).json({
-        error: "Vacancy text must be at least 20 characters long",
+        error: "Описание вакансии должно быть не короче 20 символов",
       });
       return;
     }
@@ -353,7 +368,7 @@ export const createApp = () => {
     } catch (error) {
       if (error instanceof ManualVacancyDuplicateHhIdError) {
         response.status(409).json({
-          error: `Vacancy with hhId ${error.hhId} already exists`,
+          error: `Вакансия с hh id ${error.hhId} уже есть в списке`,
         });
         return;
       }
@@ -367,7 +382,7 @@ export const createApp = () => {
 
     if (typeof rawText !== "string" || rawText.trim().length < 20) {
       response.status(400).json({
-        error: "Vacancy text must be at least 20 characters long",
+        error: "Описание вакансии должно быть не короче 20 символов",
       });
       return;
     }
@@ -403,7 +418,7 @@ export const createApp = () => {
     } catch (error) {
       if (error instanceof ManualVacancyDuplicateHhIdError) {
         response.status(409).json({
-          error: `Vacancy with hhId ${error.hhId} already exists`,
+          error: `Вакансия с hh id ${error.hhId} уже есть в списке`,
         });
         return;
       }
@@ -416,7 +431,7 @@ export const createApp = () => {
     const vacancyId = getSingleValue(request.params.id);
 
     if (!vacancyId) {
-      response.status(400).json({ error: "Manual vacancy id is required" });
+      response.status(400).json({ error: "Не передан id вакансии" });
       return;
     }
 
@@ -426,7 +441,7 @@ export const createApp = () => {
     );
 
     if (!vacancy) {
-      response.status(404).json({ error: "Manual vacancy not found" });
+      response.status(404).json({ error: "Вакансия не найдена" });
       return;
     }
 
@@ -437,56 +452,32 @@ export const createApp = () => {
     const vacancyId = getSingleValue(request.params.id);
 
     if (!vacancyId) {
-      response.status(400).json({ error: "Manual vacancy id is required" });
+      response.status(400).json({ error: "Не передан id вакансии" });
       return;
     }
 
     const vacancy = await analyzeManualVacancyById(vacancyId);
 
     if (!vacancy) {
-      response.status(404).json({ error: "Manual vacancy not found" });
+      response.status(404).json({ error: "Вакансия не найдена" });
       return;
     }
 
     response.json(vacancy);
   });
 
-  app.post("/vacancies/:id/analyze", async (request: Request, response: Response) => {
+  app.post("/manual-vacancies/:id/cover-letter", async (request: Request, response: Response) => {
     const vacancyId = getSingleValue(request.params.id);
 
     if (!vacancyId) {
-      response.status(400).json({ error: "Vacancy id is required" });
+      response.status(400).json({ error: "Не передан id вакансии" });
       return;
     }
 
-    const vacancy = await analyzeVacancyById(vacancyId);
+    const vacancy = await generateManualVacancyCoverLetterById(vacancyId);
 
     if (!vacancy) {
-      response.status(404).json({ error: "Vacancy not found" });
-      return;
-    }
-
-    response.json(vacancy);
-  });
-
-  app.patch("/vacancies/:id/status", async (request: Request, response: Response) => {
-    const vacancyId = getSingleValue(request.params.id);
-    const status = parseStatus(request.body?.status);
-
-    if (!vacancyId) {
-      response.status(400).json({ error: "Vacancy id is required" });
-      return;
-    }
-
-    if (!status) {
-      response.status(400).json({ error: "Valid status is required" });
-      return;
-    }
-
-    const vacancy = await setVacancyStatus(vacancyId, status);
-
-    if (!vacancy) {
-      response.status(404).json({ error: "Vacancy not found" });
+      response.status(404).json({ error: "Вакансия не найдена" });
       return;
     }
 

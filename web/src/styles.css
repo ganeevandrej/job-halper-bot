@@ -1,9 +1,19 @@
 :root {
-  color: #132018;
-  background:
-    radial-gradient(circle at top left, rgba(218, 239, 199, 0.9), transparent 32%),
-    linear-gradient(180deg, #f8f6ef 0%, #f0eadc 100%);
+  color: #1d2530;
+  background: #f4f7fb;
   font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  --text: #1d2530;
+  --muted: #667085;
+  --border: #d9e1ea;
+  --surface: #ffffff;
+  --surface-soft: #f8fafc;
+  --accent: #0f766e;
+  --accent-strong: #115e59;
+  --blue: #2563eb;
+  --amber: #b7791f;
+  --danger: #b42318;
+  --success: #157f3b;
+  --shadow: 0 16px 34px rgba(29, 37, 48, 0.08);
 }
 
 * {
@@ -23,7 +33,7 @@ input {
 }
 
 a {
-  color: #0e5f46;
+  color: var(--accent-strong);
 }
 
 pre {
@@ -35,30 +45,89 @@ pre {
 .page {
   max-width: 1440px;
   margin: 0 auto;
-  padding: 24px 20px 40px;
+  padding: 22px 24px 44px;
 }
 
-.appNav {
+.narrowPage {
+  max-width: 980px;
+}
+
+.appShell {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+.sideNav {
+  position: sticky;
+  top: 0;
+  align-self: start;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 100vh;
+  border-right: 1px solid var(--border);
+  padding: 18px 12px;
+  background: #101828;
+}
+
+.sideNavTitle {
+  margin: 0 8px 14px;
+  color: #98a2b3;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.sideNav button {
+  width: 100%;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 11px 12px;
+  color: #d0d5dd;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+
+.sideNav button:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.sideNav button.active {
+  border-color: rgba(20, 184, 166, 0.28);
+  color: #ffffff;
+  background: var(--accent);
+}
+
+.appMain {
+  min-width: 0;
+}
+
+.entityTabs {
   display: flex;
   gap: 8px;
   max-width: 1440px;
   margin: 0 auto;
-  padding: 16px 20px 0;
+  padding: 18px 24px 0;
 }
 
-.appNav button {
-  border: 1px solid rgba(19, 32, 24, 0.12);
-  border-radius: 999px;
-  padding: 9px 12px;
-  color: #132018;
-  background: #fffdf8;
+.entityTabs button {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 9px 13px;
+  color: var(--muted);
+  background: var(--surface);
   cursor: pointer;
+  box-shadow: 0 1px 2px rgba(29, 37, 48, 0.04);
 }
 
-.appNav button.active {
-  border-color: #135946;
-  color: #fffdf8;
-  background: #135946;
+.entityTabs button.active {
+  border-color: var(--accent);
+  color: #ffffff;
+  background: var(--accent);
 }
 
 .topbar,
@@ -79,7 +148,7 @@ pre {
 
 .eyebrow {
   margin-bottom: 6px;
-  color: #5f6d62;
+  color: var(--muted);
   font-size: 12px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -93,8 +162,9 @@ p {
 }
 
 h1 {
-  font-size: clamp(34px, 6vw, 56px);
-  line-height: 0.95;
+  font-size: 42px;
+  line-height: 1;
+  letter-spacing: 0;
 }
 
 h2 {
@@ -110,10 +180,10 @@ h2 {
 
 .statCard,
 .panel {
-  border: 1px solid rgba(19, 32, 24, 0.1);
-  border-radius: 18px;
-  background: rgba(255, 253, 247, 0.88);
-  box-shadow: 0 12px 30px rgba(65, 75, 44, 0.08);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
 }
 
 .statCard {
@@ -124,7 +194,7 @@ h2 {
 .detailLabel,
 .vacancyRowMeta,
 .listMeta {
-  color: #566257;
+  color: var(--muted);
   font-size: 13px;
 }
 
@@ -150,11 +220,16 @@ h2 {
 
 .primaryButton {
   border: 0;
-  border-radius: 999px;
+  border-radius: 8px;
   padding: 11px 16px;
-  color: #fffdf8;
-  background: linear-gradient(135deg, #135946 0%, #0b3f33 100%);
+  color: #ffffff;
+  background: var(--accent);
   cursor: pointer;
+  box-shadow: 0 8px 18px rgba(15, 118, 110, 0.22);
+}
+
+.primaryButton:hover:not(:disabled) {
+  background: var(--accent-strong);
 }
 
 .primaryButton:disabled,
@@ -177,11 +252,20 @@ h2 {
 .fieldGroup textarea,
 .fieldGroup input {
   width: 100%;
-  border: 1px solid rgba(19, 32, 24, 0.12);
+  border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 9px 10px;
-  color: #132018;
-  background: #fffdf8;
+  padding: 10px 11px;
+  color: var(--text);
+  background: var(--surface);
+  outline: none;
+}
+
+.fieldGroup textarea:focus,
+.fieldGroup input:focus,
+.filterBar input:focus,
+select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.13);
 }
 
 .fieldGroup textarea {
@@ -199,10 +283,10 @@ h2 {
   align-items: center;
   gap: 8px;
   min-height: 40px;
-  border: 1px solid rgba(19, 32, 24, 0.12);
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 5px;
-  background: #fffdf8;
+  background: var(--surface);
 }
 
 .tagList input {
@@ -210,7 +294,7 @@ h2 {
   min-width: 120px;
   border: 0;
   padding: 6px;
-  color: #132018;
+  color: var(--text);
   background: transparent;
   outline: none;
 }
@@ -220,11 +304,11 @@ h2 {
   align-items: center;
   gap: 6px;
   max-width: 100%;
-  border: 1px solid rgba(19, 32, 24, 0.1);
+  border: 1px solid #c9e7e2;
   border-radius: 8px;
   padding: 5px 7px;
-  color: #132018;
-  background: #eef7f1;
+  color: #134e4a;
+  background: #e6fffb;
   font-size: 13px;
 }
 
@@ -236,13 +320,22 @@ h2 {
   height: 18px;
   border: 0;
   border-radius: 8px;
-  color: #132018;
-  background: rgba(19, 32, 24, 0.08);
+  color: var(--text);
+  background: rgba(15, 118, 110, 0.12);
   cursor: pointer;
 }
 
 .manualWorkspace {
   align-items: start;
+}
+
+.addResumeWorkspace {
+  grid-template-columns: minmax(320px, 560px) minmax(0, 1fr);
+  align-items: start;
+}
+
+.competitorStatsGrid {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .profileLayout {
@@ -268,10 +361,10 @@ h2 {
 }
 
 .profileCard {
-  border: 1px solid rgba(19, 32, 24, 0.08);
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 12px;
-  background: #fffdf8;
+  background: var(--surface);
 }
 
 .checkboxField {
@@ -279,12 +372,12 @@ h2 {
   align-items: center;
   gap: 8px;
   margin: 0 0 14px;
-  color: #132018;
+  color: var(--text);
 }
 
 .fieldGroup textarea:read-only {
-  color: #566257;
-  background: #f8f6ef;
+  color: var(--muted);
+  background: var(--surface-soft);
 }
 
 .manualListHeader {
@@ -300,15 +393,74 @@ h2 {
 }
 
 .errorBanner,
+.noticeBanner,
 .emptyState {
   border-radius: 16px;
   padding: 14px 16px;
 }
 
+.emptyState {
+  color: var(--muted);
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+}
+
 .errorBanner {
   margin-bottom: 18px;
-  color: #7e1b18;
-  background: #f7d8d0;
+  color: var(--danger);
+  background: #fee4e2;
+  border: 1px solid #fecdca;
+}
+
+.noticeBanner {
+  margin-bottom: 18px;
+  color: var(--success);
+  background: #dcfae6;
+  border: 1px solid #abefc6;
+}
+
+.routeFallback {
+  max-width: 1440px;
+  margin: 24px auto 0;
+}
+
+.addVacancyPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.formActions,
+.filterBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.formActions {
+  justify-content: flex-end;
+}
+
+.filterBar {
+  margin-bottom: 12px;
+}
+
+.filterBar input {
+  min-width: 180px;
+  flex: 1;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: var(--text);
+  background: var(--surface);
+  outline: none;
 }
 
 .vacancyList {
@@ -321,17 +473,25 @@ h2 {
 
 .vacancyRow {
   width: 100%;
-  border: 1px solid rgba(19, 32, 24, 0.08);
-  border-radius: 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
   padding: 14px;
   text-align: left;
-  background: #fffdf8;
+  background: var(--surface);
   cursor: pointer;
+  transition: border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
+}
+
+.vacancyRow:hover {
+  border-color: #a7b7c8;
+  box-shadow: 0 8px 18px rgba(29, 37, 48, 0.08);
+  transform: translateY(-1px);
 }
 
 .vacancyRow.active {
-  border-color: #135946;
-  background: #eef7f1;
+  border-color: var(--accent);
+  background: #f0fdfa;
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.12);
 }
 
 .rowActions {
@@ -341,7 +501,7 @@ h2 {
 }
 
 .statusBadge {
-  border-radius: 999px;
+  border-radius: 8px;
   padding: 5px 9px;
   font-size: 12px;
   text-transform: uppercase;
@@ -349,31 +509,38 @@ h2 {
 }
 
 .status-new {
-  background: #d8f0df;
+  color: #065f46;
+  background: #d1fae5;
 }
 
 .status-analyzed_fit {
-  background: #cce8ff;
+  color: #1d4ed8;
+  background: #dbeafe;
 }
 
 .status-analyzed_skip {
-  background: #efe0bf;
+  color: #92400e;
+  background: #fef3c7;
 }
 
 .status-not_fit {
-  background: #f3d6d2;
+  color: #991b1b;
+  background: #fee2e2;
 }
 
 .status-analyzed {
-  background: #dde7f5;
+  color: #1d4ed8;
+  background: #dbeafe;
 }
 
 .status-applied {
-  background: #d6f0ea;
+  color: #065f46;
+  background: #ccfbf1;
 }
 
 .status-archived {
-  background: #ececec;
+  color: #475467;
+  background: #eef2f6;
 }
 
 .iconButton {
@@ -382,20 +549,22 @@ h2 {
   justify-content: center;
   width: 30px;
   height: 30px;
-  border: 1px solid rgba(19, 32, 24, 0.12);
-  border-radius: 999px;
-  background: #fffdf8;
-  color: #132018;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
   text-decoration: none;
   cursor: pointer;
 }
 
 .pagination button,
 select {
-  border: 1px solid rgba(19, 32, 24, 0.12);
-  border-radius: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
   padding: 10px 12px;
-  background: #fffdf8;
+  color: var(--text);
+  background: var(--surface);
+  outline: none;
 }
 
 .detailsPanel {
@@ -411,14 +580,14 @@ select {
 .detailsPanel .detailsContent > .detailBlock:first-child,
 .profileLayout .panel,
 .editModalPanel .fieldGroup {
-  border: 1px solid rgba(19, 32, 24, 0.08);
+  border: 1px solid var(--border);
   border-radius: 8px;
-  background: #fffdf8;
+  background: var(--surface);
 }
 
 .detailsPanel .detailsContent > .detailBlock:first-child {
   padding: 14px;
-  background: #f8fbf5;
+  background: var(--surface-soft);
 }
 
 .detailsPanel .detailGrid {
@@ -427,10 +596,10 @@ select {
 
 .detailsPanel .detailGrid > div {
   min-width: 0;
-  border: 1px solid rgba(19, 32, 24, 0.08);
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 11px 12px;
-  background: #f8fbf5;
+  background: var(--surface-soft);
 }
 
 .detailsPanel .detailGrid > div > div {
@@ -439,7 +608,7 @@ select {
 }
 
 .detailsPanel .detailsContent > .detailBlock:not(:first-child) {
-  border-top: 1px solid rgba(19, 32, 24, 0.08);
+  border-top: 1px solid var(--border);
   padding-top: 14px;
 }
 
@@ -459,18 +628,18 @@ select {
   justify-content: center;
   padding: 18px 16px;
   overflow: auto;
-  background: rgba(19, 32, 24, 0.36);
+  background: rgba(16, 24, 40, 0.48);
 }
 
 .modalPanel {
   width: min(1040px, 100%);
-  border: 1px solid rgba(19, 32, 24, 0.12);
+  border: 1px solid var(--border);
   border-radius: 8px;
   max-height: calc(100vh - 36px);
   overflow: auto;
   padding: 14px;
-  background: #fffdf8;
-  box-shadow: 0 20px 60px rgba(19, 32, 24, 0.18);
+  background: var(--surface);
+  box-shadow: 0 20px 60px rgba(16, 24, 40, 0.22);
 }
 
 .detailsModalPanel {
@@ -483,8 +652,8 @@ select {
   z-index: 1;
   margin: -18px -18px 16px;
   padding: 18px;
-  border-bottom: 1px solid rgba(19, 32, 24, 0.08);
-  background: rgba(255, 253, 248, 0.96);
+  border-bottom: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.96);
   backdrop-filter: blur(10px);
 }
 
@@ -494,10 +663,10 @@ select {
 
 .detailsModalPanel .detailGrid > div {
   min-width: 0;
-  border: 1px solid rgba(19, 32, 24, 0.08);
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 11px 12px;
-  background: #f8fbf5;
+  background: var(--surface-soft);
 }
 
 .detailsModalPanel .detailGrid > div > div {
@@ -506,14 +675,14 @@ select {
 }
 
 .detailsModalPanel .detailBlock {
-  border-top: 1px solid rgba(19, 32, 24, 0.08);
+  border-top: 1px solid var(--border);
   padding-top: 14px;
   margin-top: 14px;
 }
 
 .editModalPanel .fieldGroup {
   padding: 12px;
-  background: #f8fbf5;
+  background: var(--surface-soft);
 }
 
 .editModalPanel textarea {
@@ -527,20 +696,20 @@ select {
 .profileLayout .fieldGroup,
 .profileLayout .checkboxField {
   min-width: 0;
-  border: 1px solid rgba(19, 32, 24, 0.08);
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 11px 12px;
-  background: #f8fbf5;
+  background: var(--surface-soft);
 }
 
 .profileLayout .fieldGroup textarea,
 .profileLayout .fieldGroup input,
 .profileLayout .tagList {
-  background: #fffdf8;
+  background: var(--surface);
 }
 
 .profileLayout .panelHeader {
-  border-bottom: 1px solid rgba(19, 32, 24, 0.08);
+  border-bottom: 1px solid var(--border);
   padding-bottom: 12px;
 }
 
@@ -551,11 +720,11 @@ select {
 }
 
 .detailTag {
-  border: 1px solid rgba(19, 32, 24, 0.1);
+  border: 1px solid #c9e7e2;
   border-radius: 8px;
   padding: 6px 8px;
-  color: #132018;
-  background: #eef7f1;
+  color: #134e4a;
+  background: #e6fffb;
   font-size: 13px;
 }
 
@@ -588,12 +757,17 @@ select {
 }
 
 .secondaryButton {
-  border: 1px solid rgba(19, 32, 24, 0.12);
-  border-radius: 999px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
   padding: 8px 11px;
-  color: #132018;
-  background: #fffdf8;
+  color: var(--text);
+  background: var(--surface);
   cursor: pointer;
+}
+
+.secondaryButton:hover:not(:disabled) {
+  border-color: #a7b7c8;
+  background: var(--surface-soft);
 }
 
 .linkButton {
@@ -625,11 +799,94 @@ select {
   gap: 14px;
 }
 
+.analyticsPanel {
+  margin-bottom: 18px;
+}
+
+.statusGrid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.statusMetric {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  background: var(--surface-soft);
+}
+
+.statusMetric span {
+  display: block;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.statusMetric strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 26px;
+}
+
+.analyticsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.wideChartPanel {
+  grid-column: 1 / -1;
+}
+
+.chartPanel {
+  min-height: 390px;
+}
+
+.chartBox {
+  width: 100%;
+  min-height: 280px;
+}
+
+.chartEmpty {
+  display: grid;
+  min-height: 280px;
+  place-items: center;
+  border: 1px dashed #a7b7c8;
+  border-radius: 8px;
+  color: var(--muted);
+  background: var(--surface-soft);
+}
+
 @media (max-width: 980px) {
+  .appShell {
+    grid-template-columns: 1fr;
+  }
+
+  .sideNav {
+    position: static;
+    min-height: auto;
+    flex-direction: row;
+    flex-wrap: wrap;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .sideNavTitle {
+    flex-basis: 100%;
+    margin-bottom: 4px;
+  }
+
+  .sideNav button {
+    width: auto;
+  }
+
   .statsGrid,
   .workspace,
   .profileLayout,
   .profileGrid,
+  .formGrid,
+  .analyticsGrid,
+  .statusGrid,
   .detailGrid {
     grid-template-columns: 1fr;
   }
@@ -642,8 +899,16 @@ select {
     padding: 20px 14px 28px;
   }
 
+  h1 {
+    font-size: 34px;
+  }
+
   .topbar {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .wideChartPanel {
+    grid-column: auto;
   }
 }

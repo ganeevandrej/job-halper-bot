@@ -347,6 +347,23 @@ export const updateCandidateProfile = async (
 export const formatCandidateProfileForPrompt = (
   profile: CandidateProfile,
 ): string => {
+  return [
+    "Заголовок:",
+    profile.title,
+    "",
+    "Опыт:",
+    profile.experienceText,
+    "",
+    "Навыки:",
+    profile.skills.join(", "),
+    "",
+    "Образование:",
+    profile.educationText.trim() || "Не указано",
+    "",
+    "Обо мне:",
+    profile.about,
+  ].join("\n").trim();
+
   const lines: string[] = [
     profile.title,
     "",

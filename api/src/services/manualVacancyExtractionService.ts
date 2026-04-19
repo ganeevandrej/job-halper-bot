@@ -100,7 +100,7 @@ const parseExtraction = (content: string): ManualVacancyParsedFields => {
   const match = content.match(/\{[\s\S]*\}/);
 
   if (!match) {
-    throw new Error("LLM returned no JSON payload");
+    throw new Error("Модель не вернула данные вакансии в ожидаемом формате");
   }
 
   const parsed = JSON.parse(match[0]) as Record<string, unknown>;
@@ -127,7 +127,7 @@ export const extractManualVacancyFields = async (
   salaryOverride?: string,
 ): Promise<ManualVacancyParsedFields> => {
   if (!env.groqApiKey) {
-    throw new Error("GROQ_API_KEY is required for manual vacancy extraction");
+    throw new Error("Не задан GROQ_API_KEY. Без него нельзя разобрать вакансию");
   }
 
   try {
@@ -150,7 +150,7 @@ export const extractManualVacancyFields = async (
     const content = completion.choices[0]?.message?.content?.trim();
 
     if (!content) {
-      throw new Error("LLM returned empty response");
+      throw new Error("Модель вернула пустой ответ при разборе вакансии");
     }
 
     const parsed = parseExtraction(content);
