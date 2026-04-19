@@ -34,6 +34,9 @@ const normalizeString = (value: unknown, fallback = "Не указано"): stri
 const normalizeNullableString = (value: unknown): string | null =>
   typeof value === "string" && value.trim() ? value.trim() : null;
 
+const normalizeGender = (value: unknown): "male" | "female" | "unknown" =>
+  value === "male" || value === "female" ? value : "unknown";
+
 const normalizeNumber = (value: unknown): number | null =>
   typeof value === "number" && Number.isFinite(value)
     ? Math.max(0, Math.round(value))
@@ -75,6 +78,8 @@ ${rawText}
 Правила:
 - Верни только валидный JSON.
 - Не выдумывай опыт, технологии, зарплату или образование.
+- Если пол кандидата явно понятен из резюме, верни gender: "male" или "female". Если пол нельзя надежно определить, верни "unknown".
+- Если возраст кандидата явно указан в резюме, верни его в age_years. Если возраст нельзя надежно определить, верни null.
 - Если общий опыт, релевантный опыт или нерелевантный опыт нельзя надежно определить, верни null.
 - Релевантный опыт - опыт, полезный для frontend/React/TypeScript/веб-разработки.
 - Нерелевантный опыт - опыт вне целевой профессии или не влияющий на frontend-позиции.
@@ -85,6 +90,8 @@ ${rawText}
 Верни JSON строго такой формы:
 {
   "title": "string",
+  "gender": "male | female | unknown",
+  "age_years": number | null,
   "total_experience_months": number | null,
   "relevant_experience_months": number | null,
   "irrelevant_experience_months": number | null,
@@ -112,6 +119,8 @@ const parseCompetitorResumeAnalysis = (
 
   return {
     title: normalizeString(parsed.title),
+    gender: normalizeGender(parsed.gender),
+    ageYears: normalizeNumber(parsed.age_years),
     totalExperienceMonths: normalizeNumber(parsed.total_experience_months),
     relevantExperienceMonths: normalizeNumber(parsed.relevant_experience_months),
     irrelevantExperienceMonths: normalizeNumber(parsed.irrelevant_experience_months),
@@ -127,6 +136,11 @@ const parseCompetitorResumeAnalysis = (
     comparisonScore: normalizeScore(parsed.comparison_score),
     comparisonReason: normalizeString(parsed.comparison_reason),
   };
+};
+
+const buildHhResumeUrl = (hhId?: string): string | null => {
+  const normalized = hhId?.trim();
+  return normalized ? `https://hh.ru/resume/${normalized}` : null;
 };
 
 export const createCompetitorResume = async (
@@ -175,6 +189,7 @@ export const createCompetitorResume = async (
     const record: CompetitorResumeRecord = {
       id: randomUUID(),
       hhId: hhId || null,
+      url: buildHhResumeUrl(hhId),
       rawText: input.rawText,
       hasPhoto: input.hasPhoto,
       ...analysis,

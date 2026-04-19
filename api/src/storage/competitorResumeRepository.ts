@@ -30,15 +30,21 @@ const parseJsonArray = (value: unknown): string[] => {
 const nullableNumber = (value: unknown): number | null =>
   typeof value === "number" && Number.isFinite(value) ? value : null;
 
+const mapGender = (value: unknown): "male" | "female" | "unknown" =>
+  value === "male" || value === "female" ? value : "unknown";
+
 const DEFAULT_LIMIT = 20;
 const DEFAULT_OFFSET = 0;
 
 const mapRowToRecord = (row: Record<string, unknown>): CompetitorResumeRecord => ({
   id: String(row.id),
   hhId: typeof row.hh_id === "string" && row.hh_id ? row.hh_id : null,
+  url: typeof row.url === "string" && row.url ? row.url : null,
   rawText: String(row.raw_text),
   hasPhoto: Boolean(row.has_photo),
   title: String(row.title),
+  gender: mapGender(row.gender),
+  ageYears: nullableNumber(row.age_years),
   totalExperienceMonths: nullableNumber(row.total_experience_months),
   relevantExperienceMonths: nullableNumber(row.relevant_experience_months),
   irrelevantExperienceMonths: nullableNumber(row.irrelevant_experience_months),
@@ -87,19 +93,22 @@ export const createCompetitorResumeRecord = async (
   db.run(
     `
       INSERT INTO competitor_resumes (
-        id, hh_id, raw_text, has_photo, title, total_experience_months,
+        id, hh_id, url, raw_text, has_photo, title, gender, age_years, total_experience_months,
         relevant_experience_months, irrelevant_experience_months,
         relevant_experience_summary, salary_expectation, key_skills_json,
         strengths_json, weaknesses_json, is_better_than_mine, comparison_score,
         comparison_reason, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       record.id,
       record.hhId,
+      record.url,
       record.rawText,
       record.hasPhoto ? 1 : 0,
       record.title,
+      record.gender,
+      record.ageYears,
       record.totalExperienceMonths,
       record.relevantExperienceMonths,
       record.irrelevantExperienceMonths,
@@ -125,7 +134,7 @@ export const getCompetitorResumeById = async (
   const { db } = await getProfileDatabase();
   const statement = db.prepare(`
     SELECT
-      id, hh_id, raw_text, has_photo, title, total_experience_months,
+      id, hh_id, url, raw_text, has_photo, title, gender, age_years, total_experience_months,
       relevant_experience_months, irrelevant_experience_months,
       relevant_experience_summary, salary_expectation, key_skills_json,
       strengths_json, weaknesses_json, is_better_than_mine, comparison_score,
@@ -159,7 +168,7 @@ export const listCompetitorResumes = async (
   );
   const itemsStatement = db.prepare(`
     SELECT
-      id, hh_id, raw_text, has_photo, title, total_experience_months,
+      id, hh_id, url, raw_text, has_photo, title, gender, age_years, total_experience_months,
       relevant_experience_months, irrelevant_experience_months,
       relevant_experience_summary, salary_expectation, key_skills_json,
       strengths_json, weaknesses_json, is_better_than_mine, comparison_score,

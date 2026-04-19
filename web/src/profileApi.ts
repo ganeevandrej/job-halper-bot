@@ -2,13 +2,10 @@ import {
   CandidateProfile,
   UpdateCandidateProfileRequest,
 } from "./profileTypes";
-
-const API_BASE_URL =
-  (import.meta.env.VITE_API_BASE_URL as string | undefined) ||
-  "http://localhost:3001";
+import { buildApiUrl } from "./apiConfig";
 
 const fetchJson = async <T>(path: string, init?: RequestInit): Promise<T> => {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await fetch(buildApiUrl(path), {
     headers: {
       "Content-Type": "application/json",
       ...(init?.headers || {}),
