@@ -1,5 +1,7 @@
 export interface CompetitorResumeAnalysis {
   title: string;
+  gender: "male" | "female" | "unknown";
+  ageYears: number | null;
   totalExperienceMonths: number | null;
   relevantExperienceMonths: number | null;
   irrelevantExperienceMonths: number | null;
@@ -16,6 +18,7 @@ export interface CompetitorResumeAnalysis {
 export interface CompetitorResumeRecord extends CompetitorResumeAnalysis {
   id: string;
   hhId: string | null;
+  url: string | null;
   rawText: string;
   hasPhoto: boolean;
   createdAt: string;

@@ -1,9 +1,12 @@
 export interface CompetitorResume {
   id: string;
   hhId: string | null;
+  url: string | null;
   rawText: string;
   hasPhoto: boolean;
   title: string;
+  gender: "male" | "female" | "unknown";
+  ageYears: number | null;
   totalExperienceMonths: number | null;
   relevantExperienceMonths: number | null;
   irrelevantExperienceMonths: number | null;

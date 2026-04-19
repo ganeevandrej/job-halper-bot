@@ -17,6 +17,12 @@ const formatMonths = (value: number | null): string => {
 
 const formatDate = (value: string): string => new Date(value).toLocaleString();
 
+const GENDER_LABELS: Record<CompetitorResume["gender"], string> = {
+  male: "Мужской",
+  female: "Женский",
+  unknown: "Не указан",
+};
+
 const ListBlock = ({ title, items }: { title: string; items: string[] }) => (
   <div className="detailBlock">
     <span className="detailLabel">{title}</span>
@@ -133,6 +139,8 @@ function CompetitorResumeListPage() {
                   </span>
                 </div>
                 <div className="vacancyRowMeta">hh id: {item.hhId || "-"}</div>
+                <div className="vacancyRowMeta">Пол: {GENDER_LABELS[item.gender]}</div>
+                <div className="vacancyRowMeta">Возраст: {item.ageYears ?? "-"} лет</div>
                 <div className="vacancyRowMeta">
                   Релевантный опыт: {formatMonths(item.relevantExperienceMonths)}
                 </div>
@@ -170,6 +178,16 @@ function CompetitorResumeListPage() {
         <div className="panel detailsPanel">
           <div className="panelHeader">
             <h2>Детали</h2>
+            {selectedResume?.url ? (
+              <a
+                className="primaryButton linkButton"
+                href={selectedResume.url}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Открыть hh.ru
+              </a>
+            ) : null}
           </div>
 
           {detailsLoading ? (
@@ -185,6 +203,18 @@ function CompetitorResumeListPage() {
               </div>
 
               <div className="detailGrid">
+                <div>
+                  <span className="detailLabel">Пол</span>
+                  <div>{GENDER_LABELS[selectedResume.gender]}</div>
+                </div>
+                <div>
+                  <span className="detailLabel">Возраст</span>
+                  <div>{selectedResume.ageYears !== null ? `${selectedResume.ageYears} лет` : "-"}</div>
+                </div>
+                <div>
+                  <span className="detailLabel">URL резюме</span>
+                  <div>{selectedResume.url || "-"}</div>
+                </div>
                 <div>
                   <span className="detailLabel">Общий опыт</span>
                   <div>{formatMonths(selectedResume.totalExperienceMonths)}</div>

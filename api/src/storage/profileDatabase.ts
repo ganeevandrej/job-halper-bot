@@ -48,9 +48,12 @@ const initSchema = (db: Database): void => {
     CREATE TABLE IF NOT EXISTS competitor_resumes (
       id TEXT PRIMARY KEY,
       hh_id TEXT,
+      url TEXT,
       raw_text TEXT NOT NULL,
       has_photo INTEGER NOT NULL DEFAULT 0,
       title TEXT NOT NULL,
+      gender TEXT NOT NULL DEFAULT 'unknown',
+      age_years INTEGER,
       total_experience_months INTEGER,
       relevant_experience_months INTEGER,
       irrelevant_experience_months INTEGER,
@@ -65,6 +68,30 @@ const initSchema = (db: Database): void => {
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
+  `);
+
+  const competitorColumns = db.exec("PRAGMA table_info(competitor_resumes)")[0]
+    ?.values
+    .map((row) => String(row[1])) ?? [];
+
+  if (!competitorColumns.includes("url")) {
+    db.run("ALTER TABLE competitor_resumes ADD COLUMN url TEXT;");
+  }
+
+  if (!competitorColumns.includes("gender")) {
+    db.run("ALTER TABLE competitor_resumes ADD COLUMN gender TEXT NOT NULL DEFAULT 'unknown';");
+  }
+
+  if (!competitorColumns.includes("age_years")) {
+    db.run("ALTER TABLE competitor_resumes ADD COLUMN age_years INTEGER;");
+  }
+
+  db.run(`
+    UPDATE competitor_resumes
+    SET url = 'https://hh.ru/resume/' || hh_id
+    WHERE (url IS NULL OR url = '')
+      AND hh_id IS NOT NULL
+      AND hh_id != '';
   `);
 };
 
