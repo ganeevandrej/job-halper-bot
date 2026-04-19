@@ -48,6 +48,8 @@ export interface CreateManualVacancyRequest {
 export interface ManualVacancyListFilters {
   limit: number;
   offset: number;
+  hhId?: string;
+  status?: ManualVacancyStatus;
 }
 
 export type UpdateManualVacancyInput = Partial<
@@ -58,3 +60,22 @@ export type UpdateManualVacancyInput = Partial<
     status: ManualVacancyStatus;
   }
 >;
+
+export interface ManualVacancyStats {
+  total: number;
+  new: number;
+  analyzed: number;
+  applied: number;
+  notFit: number;
+  archived: number;
+  withMatch: number;
+  averageMatchPercent: number | null;
+  salaryBuckets: ManualVacancyStatsBucket[];
+  formatDistribution: ManualVacancyStatsBucket[];
+  gradeDistribution: ManualVacancyStatsBucket[];
+}
+
+export interface ManualVacancyStatsBucket {
+  label: string;
+  count: number;
+}

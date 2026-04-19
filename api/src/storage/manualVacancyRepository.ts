@@ -1,6 +1,7 @@
 import {
   ManualVacancyListFilters,
   ManualVacancyRecord,
+  ManualVacancyStats,
   ManualVacancyStatus,
   UpdateManualVacancyInput,
 } from "../types/manualVacancy";
@@ -106,6 +107,79 @@ const mapRowToManualVacancy = (
   analyzedAt: typeof row.analyzed_at === "string" ? row.analyzed_at : null,
 });
 
+const increment = (map: Map<string, number>, key: string): void => {
+  map.set(key, (map.get(key) ?? 0) + 1);
+};
+
+const mapToBuckets = (map: Map<string, number>) =>
+  Array.from(map.entries()).map(([label, count]) => ({ label, count }));
+
+const parseSalaryValue = (value: unknown): number | null => {
+  const text = typeof value === "string" && value.trim()
+    ? value.trim()
+    : null;
+
+  if (!text) {
+    return null;
+  }
+
+  const numbers = text.match(/\d+(?:[\s.]\d{3})*/g)
+    ?.map((value) => Number(value.replace(/[^\d]/g, "")))
+    .filter((value) => Number.isFinite(value) && value > 0) ?? [];
+
+  if (numbers.length === 0) {
+    return null;
+  }
+
+  const normalized = numbers.map((value) => value < 1000 ? value * 1000 : value);
+  const useful = normalized.slice(0, 2);
+  const average = Math.round(
+    useful.reduce((sum, value) => sum + value, 0) / useful.length,
+  );
+
+  if (/год|year|annual/i.test(text) && average > 500000) {
+    return Math.round(average / 12);
+  }
+
+  return average;
+};
+
+const getSalaryBucket = (salary: number | null): string => {
+  if (salary === null) return "Не указана";
+  if (salary < 100000) return "до 100к";
+  if (salary < 150000) return "100-150к";
+  if (salary < 200000) return "150-200к";
+  if (salary < 250000) return "200-250к";
+  if (salary < 300000) return "250-300к";
+  return "300к+";
+};
+
+const formatLabels: Record<string, string> = {
+  remote: "Удаленка",
+  hybrid: "Гибрид",
+  office: "Офис",
+  "on-site": "Офис",
+  "on site": "Офис",
+  onsite: "Офис",
+  "на месте работодателя": "Офис",
+  "удаленка": "Удаленка",
+  "удаленно": "Удаленка",
+  "удалённо": "Удаленка",
+  "гибрид": "Гибрид",
+  relocation: "Релокация",
+  unknown: "Не указан",
+};
+
+const gradeLabels: Record<string, string> = {
+  junior: "Junior",
+  junior_plus: "Junior+",
+  middle: "Middle",
+  middle_plus: "Middle+",
+  senior: "Senior",
+  lead: "Lead",
+  unknown: "Не указан",
+};
+
 export const createManualVacancy = async (
   vacancy: ManualVacancyRecord,
 ): Promise<void> => {
@@ -182,9 +256,26 @@ export const listManualVacancies = async (
   const limit = filters.limit ?? DEFAULT_LIMIT;
   const offset = filters.offset ?? DEFAULT_OFFSET;
   const { db } = await getManualVacancyDatabase();
+  const hhId = filters.hhId?.trim();
+  const whereParts: string[] = [];
+  const whereParams: string[] = [];
+
+  if (hhId) {
+    whereParts.push("hh_id LIKE ?");
+    whereParams.push(`%${hhId}%`);
+  }
+
+  if (filters.status) {
+    whereParts.push("status = ?");
+    whereParams.push(filters.status);
+  }
+
+  const whereSql = whereParts.length > 0
+    ? `WHERE ${whereParts.join(" AND ")}`
+    : "";
 
   const totalStatement = db.prepare(
-    "SELECT COUNT(*) AS total FROM manual_vacancies",
+    `SELECT COUNT(*) AS total FROM manual_vacancies ${whereSql}`,
   );
   const itemsStatement = db.prepare(`
       SELECT
@@ -193,16 +284,18 @@ export const listManualVacancies = async (
       red_flags_json, summary, match_percent, decision, reason,
       salary_estimate, cover_letter, created_at, updated_at, analyzed_at
     FROM manual_vacancies
-    ORDER BY created_at DESC
+    ${whereSql}
+    ORDER BY match_percent IS NULL ASC, match_percent DESC, created_at DESC
     LIMIT ? OFFSET ?
   `);
 
   try {
+    totalStatement.bind(whereParams);
     const total = totalStatement.step()
       ? Number(totalStatement.getAsObject().total ?? 0)
       : 0;
 
-    itemsStatement.bind([limit, offset]);
+    itemsStatement.bind([...whereParams, limit, offset]);
     const items: ManualVacancyRecord[] = [];
 
     while (itemsStatement.step()) {
@@ -215,6 +308,80 @@ export const listManualVacancies = async (
     itemsStatement.free();
   }
 };
+
+export const getManualVacancyStats =
+  async (): Promise<ManualVacancyStats> => {
+    const { db } = await getManualVacancyDatabase();
+    const result = db.exec(`
+      SELECT
+        COUNT(*) AS total,
+        SUM(CASE WHEN status = 'new' THEN 1 ELSE 0 END) AS new_count,
+        SUM(CASE WHEN status = 'analyzed' THEN 1 ELSE 0 END) AS analyzed_count,
+        SUM(CASE WHEN status = 'applied' THEN 1 ELSE 0 END) AS applied_count,
+        SUM(CASE WHEN status = 'not_fit' THEN 1 ELSE 0 END) AS not_fit_count,
+        SUM(CASE WHEN status = 'archived' THEN 1 ELSE 0 END) AS archived_count,
+        SUM(CASE WHEN match_percent IS NOT NULL THEN 1 ELSE 0 END) AS with_match_count,
+        AVG(match_percent) AS average_match_percent
+      FROM manual_vacancies
+    `);
+
+    const row = result[0]?.values[0];
+    const average = row?.[7];
+    const salaryBuckets = new Map<string, number>([
+      ["Не указана", 0],
+      ["до 100к", 0],
+      ["100-150к", 0],
+      ["150-200к", 0],
+      ["200-250к", 0],
+      ["250-300к", 0],
+      ["300к+", 0],
+    ]);
+    const formatDistribution = new Map<string, number>();
+    const gradeDistribution = new Map<string, number>();
+    const distributionRows = db.exec(`
+      SELECT salary, formats_json, format, grade
+      FROM manual_vacancies
+    `)[0]?.values ?? [];
+
+    for (const distributionRow of distributionRows) {
+      const salary = parseSalaryValue(distributionRow[0]);
+      increment(salaryBuckets, getSalaryBucket(salary));
+
+      const formats = parseJsonArray(distributionRow[1]).length > 0
+        ? parseJsonArray(distributionRow[1])
+        : typeof distributionRow[2] === "string"
+          ? [distributionRow[2]]
+          : [];
+
+      if (formats.length === 0) {
+        increment(formatDistribution, formatLabels.unknown);
+      } else {
+        for (const format of formats) {
+          increment(formatDistribution, formatLabels[format] ?? format);
+        }
+      }
+
+      const grade = typeof distributionRow[3] === "string"
+        ? distributionRow[3]
+        : "unknown";
+      increment(gradeDistribution, gradeLabels[grade] ?? grade);
+    }
+
+    return {
+      total: Number(row?.[0] ?? 0),
+      new: Number(row?.[1] ?? 0),
+      analyzed: Number(row?.[2] ?? 0),
+      applied: Number(row?.[3] ?? 0),
+      notFit: Number(row?.[4] ?? 0),
+      archived: Number(row?.[5] ?? 0),
+      withMatch: Number(row?.[6] ?? 0),
+      averageMatchPercent:
+        typeof average === "number" ? Math.round(average) : null,
+      salaryBuckets: mapToBuckets(salaryBuckets),
+      formatDistribution: mapToBuckets(formatDistribution),
+      gradeDistribution: mapToBuckets(gradeDistribution),
+    };
+  };
 
 export const getManualVacancyById = async (
   id: string,
@@ -320,7 +487,6 @@ export const saveManualVacancyAnalysis = async (
     decision: "yes" | "no";
     reason: string;
     salaryEstimate: string;
-    coverLetter: string;
   },
 ): Promise<void> => {
   const { db } = await getManualVacancyDatabase();
@@ -335,7 +501,6 @@ export const saveManualVacancyAnalysis = async (
         reason = ?,
         estimated_salary = ?,
         salary_estimate = ?,
-        cover_letter = ?,
         status = CASE
           WHEN status IN ('applied', 'not_fit', 'archived') THEN status
           ELSE 'analyzed'
@@ -350,8 +515,32 @@ export const saveManualVacancyAnalysis = async (
       analysis.reason,
       analysis.salaryEstimate,
       analysis.salaryEstimate,
-      analysis.coverLetter,
       now,
+      now,
+      id,
+    ],
+  );
+
+  await persistManualVacancyDatabase();
+};
+
+export const saveManualVacancyCoverLetter = async (
+  id: string,
+  coverLetter: string,
+): Promise<void> => {
+  const { db } = await getManualVacancyDatabase();
+  const now = new Date().toISOString();
+
+  db.run(
+    `
+      UPDATE manual_vacancies
+      SET
+        cover_letter = ?,
+        updated_at = ?
+      WHERE id = ?
+    `,
+    [
+      coverLetter,
       now,
       id,
     ],

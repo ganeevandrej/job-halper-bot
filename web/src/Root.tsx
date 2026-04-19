@@ -1,38 +1,143 @@
-import { useEffect, useState } from "react";
-import App from "./App";
-import ManualVacanciesPage from "./ManualVacanciesPage";
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  useState,
+} from "react";
+import AddCompetitorResumePage from "./AddCompetitorResumePage";
+import AddVacancyPage from "./AddVacancyPage";
+import CompetitorResumeListPage from "./CompetitorResumeListPage";
 import ProfilePage from "./ProfilePage";
+import VacancyListPage from "./VacancyListPage";
 
-type Route = "hh" | "manual" | "profile";
+const AnalyticsPage = lazy(() => import("./AnalyticsPage"));
+const CompetitorAnalyticsPage = lazy(() => import("./CompetitorAnalyticsPage"));
 
-const getRoute = (): Route => {
-  if (window.location.pathname.endsWith("/manual-vacancies")) {
-    return "manual";
+type Section = "list" | "add" | "analytics" | "profile";
+type Entity = "vacancies" | "competitors";
+
+interface RouteState {
+  section: Section;
+  entity: Entity;
+}
+
+const ROUTE_SUFFIXES = [
+  "/list/vacancies",
+  "/list/resumes",
+  "/add/vacancy",
+  "/add/resume",
+  "/analytics/vacancies",
+  "/analytics/competitors",
+  "/add-vacancy",
+  "/add-resume",
+  "/resumes",
+  "/analytics",
+  "/competitor-analytics",
+  "/profile",
+];
+
+const normalizePath = (value: string): string =>
+  value.length > 1 ? value.replace(/\/+$/, "") : value;
+
+const getRoute = (): RouteState => {
+  const path = normalizePath(window.location.pathname);
+
+  if (path.endsWith("/list/resumes") || path.endsWith("/resumes")) {
+    return { section: "list", entity: "competitors" };
   }
 
-  if (window.location.pathname.endsWith("/profile")) {
-    return "profile";
+  if (path.endsWith("/add/vacancy") || path.endsWith("/add-vacancy")) {
+    return { section: "add", entity: "vacancies" };
   }
 
-  return "hh";
+  if (path.endsWith("/add/resume") || path.endsWith("/add-resume")) {
+    return { section: "add", entity: "competitors" };
+  }
+
+  if (path.endsWith("/analytics/competitors") || path.endsWith("/competitor-analytics")) {
+    return { section: "analytics", entity: "competitors" };
+  }
+
+  if (path.endsWith("/analytics/vacancies") || path.endsWith("/analytics")) {
+    return { section: "analytics", entity: "vacancies" };
+  }
+
+  if (path.endsWith("/profile")) {
+    return { section: "profile", entity: "vacancies" };
+  }
+
+  return { section: "list", entity: "vacancies" };
 };
 
-const getBasePath = (): string =>
-  window.location.pathname
-    .replace(/\/manual-vacancies\/?$/, "")
-    .replace(/\/profile\/?$/, "") || "/";
+const getBasePath = (): string => {
+  const path = normalizePath(window.location.pathname);
+  const suffix = ROUTE_SUFFIXES.find((item) => path.endsWith(item));
 
-const getManualPath = (): string =>
-  `${getBasePath().replace(/\/$/, "")}/manual-vacancies`.replace("//", "/");
+  if (!suffix) {
+    return path || "/";
+  }
 
-const getProfilePath = (): string =>
-  `${getBasePath().replace(/\/$/, "")}/profile`.replace("//", "/");
+  const next = path.slice(0, -suffix.length);
+  return next || "/";
+};
 
-const getHhPath = (): string =>
-  getBasePath();
+const joinPath = (basePath: string, suffix: string): string =>
+  `${basePath.replace(/\/$/, "")}${suffix}`.replace("//", "/");
+
+const getPath = (section: Section, entity: Entity): string => {
+  const basePath = getBasePath();
+
+  if (section === "profile") {
+    return joinPath(basePath, "/profile");
+  }
+
+  if (section === "list") {
+    return joinPath(
+      basePath,
+      entity === "competitors" ? "/list/resumes" : "/list/vacancies",
+    );
+  }
+
+  if (section === "add") {
+    return joinPath(
+      basePath,
+      entity === "competitors" ? "/add/resume" : "/add/vacancy",
+    );
+  }
+
+  return joinPath(
+    basePath,
+    entity === "competitors" ? "/analytics/competitors" : "/analytics/vacancies",
+  );
+};
+
+const SectionTabs = ({
+  entity,
+  onChange,
+}: {
+  entity: Entity;
+  onChange: (entity: Entity) => void;
+}) => (
+  <div className="entityTabs">
+    <button
+      type="button"
+      className={entity === "vacancies" ? "active" : ""}
+      onClick={() => onChange("vacancies")}
+    >
+      Вакансии
+    </button>
+    <button
+      type="button"
+      className={entity === "competitors" ? "active" : ""}
+      onClick={() => onChange("competitors")}
+    >
+      Конкуренты
+    </button>
+  </div>
+);
 
 function Root() {
-  const [route, setRoute] = useState(getRoute);
+  const [route, setRoute] = useState<RouteState>(getRoute);
 
   useEffect(() => {
     const handlePopState = () => setRoute(getRoute());
@@ -41,50 +146,95 @@ function Root() {
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
 
-  const navigate = (nextRoute: Route) => {
-    const nextPath = nextRoute === "manual"
-      ? getManualPath()
-      : nextRoute === "profile"
-        ? getProfilePath()
-        : getHhPath();
+  const navigate = (section: Section, entity = route.entity) => {
+    const nextRoute: RouteState = {
+      section,
+      entity: section === "profile" ? "vacancies" : entity,
+    };
+    const nextPath = getPath(nextRoute.section, nextRoute.entity);
+
     window.history.pushState({}, "", nextPath);
     setRoute(nextRoute);
   };
 
+  const changeEntity = (entity: Entity) => {
+    navigate(route.section, entity);
+  };
+
+  const renderSection = () => {
+    if (route.section === "profile") {
+      return <ProfilePage />;
+    }
+
+    if (route.section === "add") {
+      return route.entity === "competitors" ? (
+        <AddCompetitorResumePage />
+      ) : (
+        <AddVacancyPage />
+      );
+    }
+
+    if (route.section === "analytics") {
+      return route.entity === "competitors" ? (
+        <Suspense fallback={<div className="emptyState routeFallback">Загружаю аналитику конкурентов...</div>}>
+          <CompetitorAnalyticsPage />
+        </Suspense>
+      ) : (
+        <Suspense fallback={<div className="emptyState routeFallback">Загружаю аналитику...</div>}>
+          <AnalyticsPage />
+        </Suspense>
+      );
+    }
+
+    return route.entity === "competitors" ? (
+      <CompetitorResumeListPage />
+    ) : (
+      <VacancyListPage />
+    );
+  };
+
   return (
-    <>
-      <nav className="appNav">
+    <div className="appShell">
+      <aside className="sideNav" aria-label="Основная навигация">
+        <div className="sideNavTitle">Job Helper</div>
         <button
           type="button"
-          className={route === "hh" ? "active" : ""}
-          onClick={() => navigate("hh")}
+          className={route.section === "list" ? "active" : ""}
+          onClick={() => navigate("list")}
         >
-          HH API
+          Список
         </button>
         <button
           type="button"
-          className={route === "manual" ? "active" : ""}
-          onClick={() => navigate("manual")}
+          className={route.section === "add" ? "active" : ""}
+          onClick={() => navigate("add")}
         >
-          Ручной ввод
+          Добавить
         </button>
         <button
           type="button"
-          className={route === "profile" ? "active" : ""}
+          className={route.section === "analytics" ? "active" : ""}
+          onClick={() => navigate("analytics")}
+        >
+          Аналитика
+        </button>
+        <button
+          type="button"
+          className={route.section === "profile" ? "active" : ""}
           onClick={() => navigate("profile")}
         >
           Профиль
         </button>
-      </nav>
+      </aside>
 
-      {route === "manual" ? (
-        <ManualVacanciesPage />
-      ) : route === "profile" ? (
-        <ProfilePage />
-      ) : (
-        <App />
-      )}
-    </>
+      <main className="appMain">
+        {route.section !== "profile" ? (
+          <SectionTabs entity={route.entity} onChange={changeEntity} />
+        ) : null}
+
+        {renderSection()}
+      </main>
+    </div>
   );
 }
 

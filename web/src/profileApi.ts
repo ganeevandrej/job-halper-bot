@@ -21,7 +21,9 @@ const fetchJson = async <T>(path: string, init?: RequestInit): Promise<T> => {
       | { error?: string }
       | null;
 
-    throw new Error(payload?.error || `Request failed with status ${response.status}`);
+    throw new Error(
+      payload?.error || `Не удалось выполнить запрос. Код ответа: ${response.status}`,
+    );
   }
 
   return (await response.json()) as T;
