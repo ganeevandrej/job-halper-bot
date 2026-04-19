@@ -1,5 +1,6 @@
 import { VacancyDetails } from "../types";
 import { SearchParams, NormalizedVacancy } from "../types/vacancy";
+import { env } from "../utils/env";
 
 interface HhApiEmployer {
   name?: string;
@@ -41,8 +42,31 @@ interface HhApiVacancyDetailsResponse {
 }
 
 const HH_API_URL = "https://api.hh.ru/vacancies";
-const HH_API_USER_AGENT = "job-helper-api/1.0 (local-dev)";
 const FALLBACK_LABEL = "Not specified";
+
+const buildHhHeaders = (): HeadersInit => {
+  const headers: Record<string, string> = {
+    Accept: "application/json",
+    "HH-User-Agent": env.hhApiUserAgent,
+    "User-Agent": env.hhApiUserAgent,
+  };
+
+  if (env.hhAccessToken) {
+    headers.Authorization = `Bearer ${env.hhAccessToken}`;
+  }
+
+  return headers;
+};
+
+const buildHhErrorMessage = async (
+  response: Response,
+  label: string,
+): Promise<string> => {
+  const body = await response.text().catch(() => "");
+  const details = body ? `: ${body}` : "";
+
+  return `HH API ${label} failed with status ${response.status}${details}`;
+};
 
 const formatSalary = (salary?: HhApiSalary | null): string | undefined => {
   if (!salary) {
@@ -118,13 +142,11 @@ export const fetchVacanciesFromApi = async (
   url.searchParams.set("page", String(params.page ?? 0));
 
   const response = await fetch(url.toString(), {
-    headers: {
-      "User-Agent": HH_API_USER_AGENT,
-    },
+    headers: buildHhHeaders(),
   });
 
   if (!response.ok) {
-    throw new Error(`HH API request failed with status ${response.status}`);
+    throw new Error(await buildHhErrorMessage(response, "request"));
   }
 
   const payload = (await response.json()) as HhApiResponse;
@@ -160,13 +182,11 @@ export const fetchVacanciesFromSearchUrl = async (
 
   const requestPage = async (page: number): Promise<HhApiResponse> => {
     const response = await fetch(buildApiUrl(page).toString(), {
-      headers: {
-        "User-Agent": HH_API_USER_AGENT,
-      },
+      headers: buildHhHeaders(),
     });
 
     if (!response.ok) {
-      throw new Error(`HH API request failed with status ${response.status}`);
+      throw new Error(await buildHhErrorMessage(response, "request"));
     }
 
     return (await response.json()) as HhApiResponse;
@@ -197,13 +217,11 @@ export const fetchVacancyDetailsFromApi = async (
   }
 
   const response = await fetch(`${HH_API_URL}/${vacancyId}`, {
-    headers: {
-      "User-Agent": HH_API_USER_AGENT,
-    },
+    headers: buildHhHeaders(),
   });
 
   if (!response.ok) {
-    throw new Error(`HH API vacancy request failed with status ${response.status}`);
+    throw new Error(await buildHhErrorMessage(response, "vacancy request"));
   }
 
   const payload = (await response.json()) as HhApiVacancyDetailsResponse;

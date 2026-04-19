@@ -7,7 +7,11 @@ import {
   runSearch,
   updateVacancyStatus,
 } from "./api";
-import { Vacancy, VacancyStats, VacancyStatus } from "./types";
+import {
+  Vacancy,
+  VacancyStats,
+  VacancyStatus,
+} from "./types";
 
 const PAGE_SIZE = 20;
 const DEFAULT_STATUSES: VacancyStatus[] = ["new", "viewed"];
@@ -180,7 +184,7 @@ function App() {
     }
   };
 
-  const handleStatusChange = async (nextStatus: VacancyStatus) => {
+  const handleApply = async () => {
     if (!selectedVacancy) {
       return;
     }
@@ -189,10 +193,10 @@ function App() {
     setError(null);
 
     try {
-      const vacancy = await updateVacancyStatus(selectedVacancy.id, nextStatus);
+      const vacancy = await updateVacancyStatus(selectedVacancy.id, "applied");
       await syncAfterChange(vacancy);
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : "Не удалось обновить статус");
+      setError(nextError instanceof Error ? nextError.message : "Не удалось отметить отклик");
     } finally {
       setStatusUpdating(false);
     }
@@ -225,7 +229,11 @@ function App() {
           <div className="eyebrow">Job Helper</div>
           <h1>Вакансии</h1>
         </div>
-        <button className="primaryButton" onClick={handleRunSearch} disabled={searching}>
+        <button
+          className="primaryButton"
+          onClick={handleRunSearch}
+          disabled={searching}
+        >
           {searching ? "Ищу..." : "Запустить поиск"}
         </button>
       </header>
@@ -260,11 +268,13 @@ function App() {
               size={5}
               value={statuses}
               onChange={(event) => {
-                const nextStatuses = Array.from(event.target.selectedOptions).map(
-                  (option) => option.value as VacancyStatus,
-                );
+                const nextStatuses = Array.from(
+                  event.target.selectedOptions,
+                ).map((option) => option.value as VacancyStatus);
                 setPage(1);
-                setStatuses(nextStatuses.length > 0 ? nextStatuses : DEFAULT_STATUSES);
+                setStatuses(
+                  nextStatuses.length > 0 ? nextStatuses : DEFAULT_STATUSES,
+                );
               }}
             >
               {STATUS_OPTIONS.map((option) => (
@@ -327,11 +337,16 @@ function App() {
           </div>
 
           <div className="pagination">
-            <button onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={page <= 1}>
+            <button
+              onClick={() => setPage((current) => Math.max(1, current - 1))}
+              disabled={page <= 1}
+            >
               Назад
             </button>
             <button
-              onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+              onClick={() =>
+                setPage((current) => Math.min(totalPages, current + 1))
+              }
               disabled={page >= totalPages}
             >
               Вперед
@@ -342,16 +357,32 @@ function App() {
         <div className="panel detailsPanel">
           <div className="panelHeader">
             <h2>Детали</h2>
-            <button
-              className="primaryButton"
-              onClick={handleAnalyze}
-              disabled={!selectedId || analyzing}
-            >
-              {analyzing ? "Анализирую..." : "Анализировать"}
-            </button>
+            <div className="detailsActions">
+              <button
+                // type="button"
+                className="secondaryButton mediumSize"
+                onClick={() => void handleApply()}
+                disabled={
+                  !selectedVacancy ||
+                  statusUpdating ||
+                  selectedVacancy.status === "applied"
+                }
+              >
+                Откликнулся
+              </button>
+              <button
+                className="primaryButton"
+                onClick={handleAnalyze}
+                disabled={!selectedId || analyzing}
+              >
+                {analyzing ? "Анализирую..." : "Анализировать"}
+              </button>
+            </div>
           </div>
 
-          {detailsLoading ? <div className="emptyState">Загружаю детали...</div> : null}
+          {detailsLoading ? (
+            <div className="emptyState">Загружаю детали...</div>
+          ) : null}
 
           {!detailsLoading && selectedVacancy ? (
             <div className="detailsContent">
@@ -367,19 +398,13 @@ function App() {
               <div className="detailGrid">
                 <div>
                   <span className="detailLabel">Статус</span>
-                  <select
-                    value={selectedVacancy.status}
-                    onChange={(event) =>
-                      void handleStatusChange(event.target.value as VacancyStatus)
-                    }
-                    disabled={statusUpdating}
-                  >
-                    {STATUS_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
+                  <div>
+                    <span
+                      className={`statusBadge status-${selectedVacancy.status}`}
+                    >
+                      {STATUS_LABELS[selectedVacancy.status]}
+                    </span>
+                  </div>
                 </div>
                 <div>
                   <span className="detailLabel">Создана</span>
@@ -397,7 +422,9 @@ function App() {
 
               <div className="detailBlock">
                 <span className="detailLabel">Описание</span>
-                <pre>{selectedVacancy.description || "Описание пока не загружено"}</pre>
+                <pre>
+                  {selectedVacancy.description || "Описание пока не загружено"}
+                </pre>
               </div>
 
               <div className="detailBlock">
