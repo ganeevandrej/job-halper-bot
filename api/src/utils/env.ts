@@ -20,4 +20,8 @@ export const env = {
     process.env.GROQ_MODEL ||
     "meta-llama/llama-4-scout-17b-16e-instruct",
   webAppUrl: process.env.WEB_APP_URL || "http://localhost:5173",
+  corsAllowedOrigins:
+    process.env.CORS_ALLOWED_ORIGINS ||
+    process.env.WEB_APP_URL ||
+    "http://localhost:5173,https://ganeevandrej.github.io",
 };

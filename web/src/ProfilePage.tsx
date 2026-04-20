@@ -8,12 +8,15 @@ function ProfilePage() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [coverLetterEditing, setCoverLetterEditing] = useState(false);
+  const [summaryModalOpen, setSummaryModalOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
     const load = async () => {
       setLoading(true);
       setError(null);
+      setNotice(null);
 
       try {
         setProfile(await getProfile());
@@ -52,6 +55,7 @@ function ProfilePage() {
 
     setSaving(true);
     setError(null);
+    setNotice(null);
 
     try {
       const saved = await updateProfile({
@@ -68,6 +72,17 @@ function ProfilePage() {
       });
       setProfile(saved);
       setCoverLetterEditing(false);
+      if (saved.resumeProcessingStatus === "completed") {
+        setNotice("Профиль сохранён, короткая версия резюме обновлена.");
+      } else if (saved.resumeProcessingStatus === "failed") {
+        setNotice(
+          saved.resumeProcessingError
+            ? `Профиль сохранён, но короткую версию не удалось обновить: ${saved.resumeProcessingError}`
+            : "Профиль сохранён, но короткую версию не удалось обновить.",
+        );
+      } else {
+        setNotice("Профиль сохранён.");
+      }
     } catch (nextError) {
       setError(
         nextError instanceof Error
@@ -96,6 +111,7 @@ function ProfilePage() {
       </header>
 
       {error ? <div className="errorBanner">{error}</div> : null}
+      {notice ? <div className="noticeBanner">{notice}</div> : null}
       {loading ? <div className="emptyState">Загружаю профиль...</div> : null}
 
       {profile ? (
@@ -238,6 +254,82 @@ function ProfilePage() {
               />
             </label>
           </div>
+          <div className="panel profileFullWidth">
+            <div className="panelHeader">
+              <div>
+                <h2>Короткая версия резюме</h2>
+                <p className="mutedText">
+                  Статус: {profile.resumeProcessingStatus}
+                  {profile.resumeSummaryUpdatedAt
+                    ? `, обновлено ${new Date(profile.resumeSummaryUpdatedAt).toLocaleString()}`
+                    : ""}
+                </p>
+              </div>
+              <button
+                className="secondaryButton"
+                type="button"
+                onClick={() => setSummaryModalOpen(true)}
+              >
+                Краткая версия
+              </button>
+            </div>
+
+            {profile.resumeProcessingError ? (
+              <div className="errorBanner">{profile.resumeProcessingError}</div>
+            ) : null}
+
+            <p className="summaryPreview">
+              {profile.resumeSummaryText ||
+                "Короткая версия появится после успешного сохранения профиля."}
+            </p>
+          </div>
+
+          {summaryModalOpen ? (
+            <div
+              className="modalBackdrop"
+              role="presentation"
+              onClick={() => setSummaryModalOpen(false)}
+            >
+              <div
+                className="modalPanel detailsModalPanel summaryModalPanel"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="summary-modal-title"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <div className="modalHeader">
+                  <div>
+                    <h2 id="summary-modal-title">Краткая версия резюме</h2>
+                    <p className="mutedText">
+                      Статус: {profile.resumeProcessingStatus}
+                      {profile.resumeSummaryUpdatedAt
+                        ? `, обновлено ${new Date(profile.resumeSummaryUpdatedAt).toLocaleString()}`
+                        : ""}
+                    </p>
+                  </div>
+                  <button
+                    className="secondaryButton"
+                    type="button"
+                    onClick={() => setSummaryModalOpen(false)}
+                  >
+                    Закрыть
+                  </button>
+                </div>
+
+                {profile.resumeProcessingError ? (
+                  <div className="errorBanner">{profile.resumeProcessingError}</div>
+                ) : null}
+
+                <div className="detailBlock">
+                  <span className="detailLabel">Выжимка для анализа</span>
+                  <pre className="summaryText">
+                    {profile.resumeSummaryText ||
+                      "Короткая версия пока не сформирована."}
+                  </pre>
+                </div>
+              </div>
+            </div>
+          ) : null}
         </section>
       ) : null}
     </div>

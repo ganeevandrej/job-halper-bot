@@ -22,8 +22,8 @@ import {
 } from "./types/profile";
 import {
   getCandidateProfile,
-  updateCandidateProfile,
 } from "./storage/profileRepository";
+import { updateCandidateProfileWithSummary } from "./services/profileSummaryService";
 import { getManualVacancyStats } from "./storage/manualVacancyRepository";
 import {
   CompetitorResumeDuplicateHhIdError,
@@ -34,6 +34,7 @@ import {
   getCompetitorResumeStats,
   listCompetitorResumes,
 } from "./storage/competitorResumeRepository";
+import { env } from "./utils/env";
 
 const ALLOWED_MANUAL_VACANCY_STATUSES: ManualVacancyStatus[] = [
   "new",
@@ -183,18 +184,55 @@ const getSingleValue = (value: unknown): string | undefined => {
   return undefined;
 };
 
+const normalizeOrigin = (value: string): string | null => {
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return null;
+  }
+
+  if (trimmed === "*") {
+    return trimmed;
+  }
+
+  try {
+    return new URL(trimmed).origin;
+  } catch {
+    return trimmed.replace(/\/$/, "");
+  }
+};
+
+const parseAllowedOrigins = (value: string): string[] =>
+  value
+    .split(",")
+    .map(normalizeOrigin)
+    .filter((item): item is string => Boolean(item));
+
+const allowedCorsOrigins = parseAllowedOrigins(env.corsAllowedOrigins);
+
+const isOriginAllowed = (origin: string): boolean =>
+  allowedCorsOrigins.includes("*") || allowedCorsOrigins.includes(origin);
+
 export const createApp = () => {
   const app = express();
 
-  app.use(express.json());
-  app.use((_: Request, response: Response, next: NextFunction) => {
-    response.setHeader("Access-Control-Allow-Origin", "*");
-    response.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,OPTIONS");
-    response.setHeader("Access-Control-Allow-Headers", "Content-Type");
-    next();
-  });
-
   app.use((request: Request, response: Response, next: NextFunction) => {
+    const origin = request.headers.origin;
+
+    if (typeof origin === "string" && isOriginAllowed(origin)) {
+      response.setHeader("Access-Control-Allow-Origin", origin);
+      response.setHeader("Vary", "Origin");
+    } else if (allowedCorsOrigins.includes("*")) {
+      response.setHeader("Access-Control-Allow-Origin", "*");
+    }
+
+    response.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,OPTIONS");
+    response.setHeader(
+      "Access-Control-Allow-Headers",
+      "Content-Type, Authorization, ngrok-skip-browser-warning",
+    );
+    response.setHeader("Access-Control-Max-Age", "86400");
+
     if (request.method === "OPTIONS") {
       response.status(204).end();
       return;
@@ -202,6 +240,7 @@ export const createApp = () => {
 
     next();
   });
+  app.use(express.json());
 
   app.get("/health", (_: Request, response: Response) => {
     response.json({ ok: true });
@@ -221,7 +260,7 @@ export const createApp = () => {
       return;
     }
 
-    response.json(await updateCandidateProfile(input));
+    response.json(await updateCandidateProfileWithSummary(input));
   });
 
   app.post("/competitor-resumes", async (request: Request, response: Response) => {

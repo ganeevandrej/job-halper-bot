@@ -39,10 +39,39 @@ const initSchema = (db: Database): void => {
       experience_text TEXT,
       education_text TEXT,
       cover_letter_instructions TEXT NOT NULL,
+      resume_summary_text TEXT,
+      resume_structured_json TEXT,
+      resume_processing_status TEXT NOT NULL DEFAULT 'idle',
+      resume_processing_error TEXT,
+      resume_summary_updated_at TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
   `);
+
+  const profileColumns = db.exec("PRAGMA table_info(candidate_profile)")[0]
+    ?.values
+    .map((row) => String(row[1])) ?? [];
+
+  if (!profileColumns.includes("resume_summary_text")) {
+    db.run("ALTER TABLE candidate_profile ADD COLUMN resume_summary_text TEXT;");
+  }
+
+  if (!profileColumns.includes("resume_structured_json")) {
+    db.run("ALTER TABLE candidate_profile ADD COLUMN resume_structured_json TEXT;");
+  }
+
+  if (!profileColumns.includes("resume_processing_status")) {
+    db.run("ALTER TABLE candidate_profile ADD COLUMN resume_processing_status TEXT NOT NULL DEFAULT 'idle';");
+  }
+
+  if (!profileColumns.includes("resume_processing_error")) {
+    db.run("ALTER TABLE candidate_profile ADD COLUMN resume_processing_error TEXT;");
+  }
+
+  if (!profileColumns.includes("resume_summary_updated_at")) {
+    db.run("ALTER TABLE candidate_profile ADD COLUMN resume_summary_updated_at TEXT;");
+  }
 
   db.run(`
     CREATE TABLE IF NOT EXISTS competitor_resumes (

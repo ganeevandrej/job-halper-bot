@@ -6,29 +6,7 @@ import {
   ManualVacancyStatus,
   UpdateManualVacancyRequest,
 } from "./manualVacancyTypes";
-import { buildApiUrl } from "./apiConfig";
-
-const fetchJson = async <T>(path: string, init?: RequestInit): Promise<T> => {
-  const response = await fetch(buildApiUrl(path), {
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers || {}),
-    },
-    ...init,
-  });
-
-  if (!response.ok) {
-    const payload = (await response.json().catch(() => null)) as
-      | { error?: string }
-      | null;
-
-    throw new Error(
-      payload?.error || `Не удалось выполнить запрос. Код ответа: ${response.status}`,
-    );
-  }
-
-  return (await response.json()) as T;
-};
+import { fetchJson } from "./fetchJson";
 
 export const createManualVacancy = async (
   request: CreateManualVacancyRequest,

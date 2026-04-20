@@ -1,5 +1,7 @@
 import {
   CandidateProfile,
+  CandidateResumeStructuredSummary,
+  ResumeProcessingStatus,
   UpdateCandidateProfileInput,
 } from "../types/profile";
 import { getProfileDatabase, persistProfileDatabase } from "./profileDatabase";
@@ -135,6 +137,29 @@ const parseJsonArray = <T>(value: unknown, fallback: T[]): T[] => {
 
 const stringifyJson = (value: unknown): string => JSON.stringify(value);
 
+const parseStructuredSummary = (
+  value: unknown,
+): CandidateResumeStructuredSummary | null => {
+  if (typeof value !== "string" || !value.trim()) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(value) as CandidateResumeStructuredSummary;
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+};
+
+const parseResumeProcessingStatus = (
+  value: unknown,
+): ResumeProcessingStatus => {
+  return value === "processing" || value === "completed" || value === "failed"
+    ? value
+    : "idle";
+};
+
 const getColumnNames = async (): Promise<Set<string>> => {
   const { db } = await getProfileDatabase();
   const columns = db.exec("PRAGMA table_info(candidate_profile)");
@@ -212,6 +237,22 @@ const mapRowToProfile = (row: Record<string, unknown>): CandidateProfile => ({
       ? row.education_text
       : formatLegacyEducation(row.education_json),
   coverLetterInstructions: String(row.cover_letter_instructions),
+  resumeSummaryText:
+    typeof row.resume_summary_text === "string" && row.resume_summary_text
+      ? row.resume_summary_text
+      : null,
+  resumeStructured: parseStructuredSummary(row.resume_structured_json),
+  resumeProcessingStatus: parseResumeProcessingStatus(
+    row.resume_processing_status,
+  ),
+  resumeProcessingError:
+    typeof row.resume_processing_error === "string" && row.resume_processing_error
+      ? row.resume_processing_error
+      : null,
+  resumeSummaryUpdatedAt:
+    typeof row.resume_summary_updated_at === "string" && row.resume_summary_updated_at
+      ? row.resume_summary_updated_at
+      : null,
   createdAt: String(row.created_at),
   updatedAt: String(row.updated_at),
 });
@@ -226,8 +267,8 @@ export const createDefaultProfile = async (): Promise<CandidateProfile> => {
         id, title, salary_expectation, formats_json, location, has_photo,
         about, skills_json, experience_json, education_json,
         experience_text, education_text,
-        cover_letter_instructions, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        cover_letter_instructions, resume_processing_status, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       PROFILE_ID,
@@ -243,6 +284,7 @@ export const createDefaultProfile = async (): Promise<CandidateProfile> => {
       DEFAULT_PROFILE.experienceText,
       DEFAULT_PROFILE.educationText,
       DEFAULT_PROFILE.coverLetterInstructions,
+      "idle",
       now,
       now,
     ],
@@ -261,11 +303,28 @@ export const getCandidateProfile = async (): Promise<CandidateProfile> => {
   const educationSelect = columnNames.has("education_text")
     ? "education_text"
     : "NULL AS education_text";
+  const resumeSummarySelect = columnNames.has("resume_summary_text")
+    ? "resume_summary_text"
+    : "NULL AS resume_summary_text";
+  const resumeStructuredSelect = columnNames.has("resume_structured_json")
+    ? "resume_structured_json"
+    : "NULL AS resume_structured_json";
+  const resumeStatusSelect = columnNames.has("resume_processing_status")
+    ? "resume_processing_status"
+    : "'idle' AS resume_processing_status";
+  const resumeErrorSelect = columnNames.has("resume_processing_error")
+    ? "resume_processing_error"
+    : "NULL AS resume_processing_error";
+  const resumeUpdatedSelect = columnNames.has("resume_summary_updated_at")
+    ? "resume_summary_updated_at"
+    : "NULL AS resume_summary_updated_at";
   const statement = db.prepare(`
     SELECT
       id, title, salary_expectation, formats_json, location, has_photo,
       about, skills_json, experience_json, education_json,
       ${experienceSelect}, ${educationSelect},
+      ${resumeSummarySelect}, ${resumeStructuredSelect},
+      ${resumeStatusSelect}, ${resumeErrorSelect}, ${resumeUpdatedSelect},
       cover_letter_instructions, created_at, updated_at
     FROM candidate_profile
     WHERE id = ?
@@ -305,6 +364,26 @@ export const updateCandidateProfile = async (
     db.run("ALTER TABLE candidate_profile ADD COLUMN education_text TEXT");
   }
 
+  if (!columnNames.has("resume_summary_text")) {
+    db.run("ALTER TABLE candidate_profile ADD COLUMN resume_summary_text TEXT");
+  }
+
+  if (!columnNames.has("resume_structured_json")) {
+    db.run("ALTER TABLE candidate_profile ADD COLUMN resume_structured_json TEXT");
+  }
+
+  if (!columnNames.has("resume_processing_status")) {
+    db.run("ALTER TABLE candidate_profile ADD COLUMN resume_processing_status TEXT NOT NULL DEFAULT 'idle'");
+  }
+
+  if (!columnNames.has("resume_processing_error")) {
+    db.run("ALTER TABLE candidate_profile ADD COLUMN resume_processing_error TEXT");
+  }
+
+  if (!columnNames.has("resume_summary_updated_at")) {
+    db.run("ALTER TABLE candidate_profile ADD COLUMN resume_summary_updated_at TEXT");
+  }
+
   const now = new Date().toISOString();
 
   db.run(
@@ -321,6 +400,11 @@ export const updateCandidateProfile = async (
         experience_text = ?,
         education_text = ?,
         cover_letter_instructions = ?,
+        resume_summary_text = ?,
+        resume_structured_json = ?,
+        resume_processing_status = ?,
+        resume_processing_error = ?,
+        resume_summary_updated_at = ?,
         updated_at = ?
       WHERE id = ?
     `,
@@ -335,6 +419,11 @@ export const updateCandidateProfile = async (
       input.experienceText,
       input.educationText,
       input.coverLetterInstructions,
+      null,
+      null,
+      "processing",
+      null,
+      null,
       now,
       PROFILE_ID,
     ],
@@ -344,26 +433,67 @@ export const updateCandidateProfile = async (
   return getCandidateProfile();
 };
 
-export const formatCandidateProfileForPrompt = (
+export const updateCandidateProfileSummary = async (
+  summaryText: string,
+  structured: CandidateResumeStructuredSummary,
+): Promise<CandidateProfile> => {
+  await getCandidateProfile();
+  const { db } = await getProfileDatabase();
+  const now = new Date().toISOString();
+
+  db.run(
+    `
+      UPDATE candidate_profile
+      SET
+        resume_summary_text = ?,
+        resume_structured_json = ?,
+        resume_processing_status = ?,
+        resume_processing_error = ?,
+        resume_summary_updated_at = ?,
+        updated_at = ?
+      WHERE id = ?
+    `,
+    [
+      summaryText,
+      stringifyJson(structured),
+      "completed",
+      null,
+      now,
+      now,
+      PROFILE_ID,
+    ],
+  );
+
+  await persistProfileDatabase();
+  return getCandidateProfile();
+};
+
+export const markCandidateProfileSummaryFailed = async (
+  errorMessage: string,
+): Promise<CandidateProfile> => {
+  await getCandidateProfile();
+  const { db } = await getProfileDatabase();
+  const now = new Date().toISOString();
+
+  db.run(
+    `
+      UPDATE candidate_profile
+      SET
+        resume_processing_status = ?,
+        resume_processing_error = ?,
+        updated_at = ?
+      WHERE id = ?
+    `,
+    ["failed", errorMessage, now, PROFILE_ID],
+  );
+
+  await persistProfileDatabase();
+  return getCandidateProfile();
+};
+
+export const formatCandidateProfileFullForPrompt = (
   profile: CandidateProfile,
 ): string => {
-  return [
-    "Заголовок:",
-    profile.title,
-    "",
-    "Опыт:",
-    profile.experienceText,
-    "",
-    "Навыки:",
-    profile.skills.join(", "),
-    "",
-    "Образование:",
-    profile.educationText.trim() || "Не указано",
-    "",
-    "Обо мне:",
-    profile.about,
-  ].join("\n").trim();
-
   const lines: string[] = [
     profile.title,
     "",
@@ -393,4 +523,29 @@ export const formatCandidateProfileForPrompt = (
   }
 
   return lines.join("\n").trim();
+};
+
+export const formatCandidateProfileForPrompt = (
+  profile: CandidateProfile,
+): string => {
+  if (
+    profile.resumeProcessingStatus === "completed" &&
+    profile.resumeSummaryText?.trim()
+  ) {
+    const structured = profile.resumeStructured
+      ? [
+          "",
+          "Structured summary:",
+          JSON.stringify(profile.resumeStructured, null, 2),
+        ].join("\n")
+      : "";
+
+    return [
+      "Short candidate profile:",
+      profile.resumeSummaryText.trim(),
+      structured,
+    ].join("\n").trim();
+  }
+
+  return formatCandidateProfileFullForPrompt(profile);
 };
