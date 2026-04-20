@@ -713,6 +713,52 @@ select {
   padding-bottom: 12px;
 }
 
+.mutedText {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.summaryMetaGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.summaryMetaGrid > div {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 11px 12px;
+  background: var(--surface-soft);
+}
+
+.summaryMetaGrid p {
+  margin: 6px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.summaryPreview {
+  display: -webkit-box;
+  margin: 14px 0 0;
+  overflow: hidden;
+  color: var(--text);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.summaryModalPanel .summaryMetaGrid {
+  margin-top: 14px;
+}
+
+.summaryText {
+  margin: 8px 0 0;
+  font-family: inherit;
+  font-size: 15px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .tagRow {
   display: flex;
   flex-wrap: wrap;
@@ -884,6 +930,7 @@ select {
   .workspace,
   .profileLayout,
   .profileGrid,
+  .summaryMetaGrid,
   .formGrid,
   .analyticsGrid,
   .statusGrid,
