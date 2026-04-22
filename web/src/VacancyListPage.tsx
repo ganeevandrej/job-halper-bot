@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   analyzeManualVacancy,
   generateManualVacancyCoverLetter,
@@ -12,6 +12,8 @@ import {
 } from "./manualVacancyTypes";
 
 const PAGE_SIZE = 20;
+
+type VacancySortMode = "default" | "company_asc";
 
 const STATUS_LABELS: Record<ManualVacancyStatus, string> = {
   new: "Новая",
@@ -50,14 +52,14 @@ const DetailList = ({ items }: { items: string[] }) =>
 function VacancyListPage() {
   const [items, setItems] = useState<ManualVacancy[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [selectedVacancy, setSelectedVacancy] =
-    useState<ManualVacancy | null>(null);
+  const [selectedVacancy, setSelectedVacancy] = useState<ManualVacancy | null>(null);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [hhIdDraft, setHhIdDraft] = useState("");
   const [hhIdFilter, setHhIdFilter] = useState("");
   const [statusDraft, setStatusDraft] = useState<ManualVacancyStatus | "">("");
   const [statusFilter, setStatusFilter] = useState<ManualVacancyStatus | "">("");
+  const [sortMode, setSortMode] = useState<VacancySortMode>("default");
   const [listLoading, setListLoading] = useState(false);
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
@@ -66,6 +68,26 @@ function VacancyListPage() {
   const [error, setError] = useState<string | null>(null);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  const visibleItems = useMemo(() => {
+    if (sortMode === "default") {
+      return items;
+    }
+
+    return [...items].sort((left, right) => {
+      const companyCompare = left.company.localeCompare(right.company, "ru", {
+        sensitivity: "base",
+      });
+
+      if (companyCompare !== 0) {
+        return companyCompare;
+      }
+
+      return left.title.localeCompare(right.title, "ru", {
+        sensitivity: "base",
+      });
+    });
+  }, [items, sortMode]);
 
   const loadList = async (
     nextPage: number,
@@ -248,6 +270,15 @@ function VacancyListPage() {
                 </option>
               ))}
             </select>
+            <select
+              value={sortMode}
+              onChange={(event) =>
+                setSortMode(event.target.value as VacancySortMode)
+              }
+            >
+              <option value="default">По умолчанию</option>
+              <option value="company_asc">Компания А-Я</option>
+            </select>
             <button className="secondaryButton" type="button" onClick={applyFilter}>
               Найти
             </button>
@@ -257,12 +288,16 @@ function VacancyListPage() {
           </div>
 
           <div className="listMeta">
-            <span>По умолчанию выше вакансии с большим совпадением.</span>
+            <span>
+              {sortMode === "company_asc"
+                ? "Список отсортирован по названию компании."
+                : "По умолчанию выше вакансии с большим совпадением."}
+            </span>
             <span>Страница {page} / {totalPages}</span>
           </div>
 
           <div className="vacancyList">
-            {items.map((item) => (
+            {visibleItems.map((item) => (
               <button
                 key={item.id}
                 className={`vacancyRow ${selectedId === item.id ? "active" : ""}`}
@@ -277,13 +312,14 @@ function VacancyListPage() {
                 </div>
                 <div className="vacancyRowMeta">{item.company}</div>
                 <div className="vacancyRowMeta">hh id: {item.hhId || "-"}</div>
+                <div className="vacancyRowMeta">company id: {item.companyId || "-"}</div>
                 <div className="vacancyRowMeta">
                   Совпадение: {item.matchPercent ?? "-"}%
                 </div>
               </button>
             ))}
 
-            {!listLoading && items.length === 0 ? (
+            {!listLoading && visibleItems.length === 0 ? (
               <div className="emptyState">Вакансии не найдены.</div>
             ) : null}
           </div>
@@ -298,9 +334,7 @@ function VacancyListPage() {
             </button>
             <button
               type="button"
-              onClick={() =>
-                setPage((current) => Math.min(totalPages, current + 1))
-              }
+              onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
               disabled={page >= totalPages}
             >
               Вперед
@@ -390,8 +424,16 @@ function VacancyListPage() {
 
               <div className="detailGrid">
                 <div>
+                  <span className="detailLabel">Компания</span>
+                  <div>{selectedVacancy.company}</div>
+                </div>
+                <div>
                   <span className="detailLabel">hh id</span>
                   <div>{selectedVacancy.hhId || "-"}</div>
+                </div>
+                <div>
+                  <span className="detailLabel">company id</span>
+                  <div>{selectedVacancy.companyId || "-"}</div>
                 </div>
                 <div>
                   <span className="detailLabel">Совпадение</span>

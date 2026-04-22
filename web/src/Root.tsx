@@ -4,8 +4,10 @@ import {
   useEffect,
   useState,
 } from "react";
+import AddCompanyPage from "./AddCompanyPage";
 import AddCompetitorResumePage from "./AddCompetitorResumePage";
 import AddVacancyPage from "./AddVacancyPage";
+import CompanyListPage from "./CompanyListPage";
 import CompetitorResumeListPage from "./CompetitorResumeListPage";
 import ProfilePage from "./ProfilePage";
 import VacancyListPage from "./VacancyListPage";
@@ -14,7 +16,7 @@ const AnalyticsPage = lazy(() => import("./AnalyticsPage"));
 const CompetitorAnalyticsPage = lazy(() => import("./CompetitorAnalyticsPage"));
 
 type Section = "list" | "add" | "analytics" | "profile";
-type Entity = "vacancies" | "competitors";
+type Entity = "vacancies" | "competitors" | "companies";
 
 interface RouteState {
   section: Section;
@@ -24,10 +26,13 @@ interface RouteState {
 const ROUTE_SUFFIXES = [
   "/list/vacancies",
   "/list/resumes",
+  "/list/companies",
   "/add/vacancy",
   "/add/resume",
+  "/add/company",
   "/analytics/vacancies",
   "/analytics/competitors",
+  "/analytics/companies",
   "/add-vacancy",
   "/add-resume",
   "/resumes",
@@ -46,6 +51,10 @@ const getRoute = (): RouteState => {
     return { section: "list", entity: "competitors" };
   }
 
+  if (path.endsWith("/list/companies")) {
+    return { section: "list", entity: "companies" };
+  }
+
   if (path.endsWith("/add/vacancy") || path.endsWith("/add-vacancy")) {
     return { section: "add", entity: "vacancies" };
   }
@@ -54,8 +63,16 @@ const getRoute = (): RouteState => {
     return { section: "add", entity: "competitors" };
   }
 
+  if (path.endsWith("/add/company")) {
+    return { section: "add", entity: "companies" };
+  }
+
   if (path.endsWith("/analytics/competitors") || path.endsWith("/competitor-analytics")) {
     return { section: "analytics", entity: "competitors" };
+  }
+
+  if (path.endsWith("/analytics/companies")) {
+    return { section: "analytics", entity: "companies" };
   }
 
   if (path.endsWith("/analytics/vacancies") || path.endsWith("/analytics")) {
@@ -94,20 +111,32 @@ const getPath = (section: Section, entity: Entity): string => {
   if (section === "list") {
     return joinPath(
       basePath,
-      entity === "competitors" ? "/list/resumes" : "/list/vacancies",
+      entity === "competitors"
+        ? "/list/resumes"
+        : entity === "companies"
+          ? "/list/companies"
+          : "/list/vacancies",
     );
   }
 
   if (section === "add") {
     return joinPath(
       basePath,
-      entity === "competitors" ? "/add/resume" : "/add/vacancy",
+      entity === "competitors"
+        ? "/add/resume"
+        : entity === "companies"
+          ? "/add/company"
+          : "/add/vacancy",
     );
   }
 
   return joinPath(
     basePath,
-    entity === "competitors" ? "/analytics/competitors" : "/analytics/vacancies",
+    entity === "competitors"
+      ? "/analytics/competitors"
+      : entity === "companies"
+        ? "/analytics/companies"
+        : "/analytics/vacancies",
   );
 };
 
@@ -132,6 +161,13 @@ const SectionTabs = ({
       onClick={() => onChange("competitors")}
     >
       Конкуренты
+    </button>
+    <button
+      type="button"
+      className={entity === "companies" ? "active" : ""}
+      onClick={() => onChange("companies")}
+    >
+      Компании
     </button>
   </div>
 );
@@ -167,30 +203,50 @@ function Root() {
     }
 
     if (route.section === "add") {
-      return route.entity === "competitors" ? (
-        <AddCompetitorResumePage />
-      ) : (
-        <AddVacancyPage />
-      );
+      if (route.entity === "competitors") {
+        return <AddCompetitorResumePage />;
+      }
+
+      if (route.entity === "companies") {
+        return <AddCompanyPage />;
+      }
+
+      return <AddVacancyPage />;
     }
 
     if (route.section === "analytics") {
-      return route.entity === "competitors" ? (
-        <Suspense fallback={<div className="emptyState routeFallback">Загружаю аналитику конкурентов...</div>}>
-          <CompetitorAnalyticsPage />
-        </Suspense>
-      ) : (
+      if (route.entity === "competitors") {
+        return (
+          <Suspense fallback={<div className="emptyState routeFallback">Загружаю аналитику конкурентов...</div>}>
+            <CompetitorAnalyticsPage />
+          </Suspense>
+        );
+      }
+
+      if (route.entity === "companies") {
+        return (
+          <div className="page">
+            <div className="emptyState">Для компаний аналитика пока не добавлена.</div>
+          </div>
+        );
+      }
+
+      return (
         <Suspense fallback={<div className="emptyState routeFallback">Загружаю аналитику...</div>}>
           <AnalyticsPage />
         </Suspense>
       );
     }
 
-    return route.entity === "competitors" ? (
-      <CompetitorResumeListPage />
-    ) : (
-      <VacancyListPage />
-    );
+    if (route.entity === "competitors") {
+      return <CompetitorResumeListPage />;
+    }
+
+    if (route.entity === "companies") {
+      return <CompanyListPage />;
+    }
+
+    return <VacancyListPage />;
   };
 
   return (

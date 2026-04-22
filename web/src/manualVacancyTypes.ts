@@ -8,6 +8,7 @@ export type ManualVacancyStatus =
 export interface ManualVacancy {
   id: string;
   hhId: string | null;
+  companyId: string | null;
   url: string | null;
   rawText: string;
   status: ManualVacancyStatus;
@@ -64,13 +65,14 @@ export interface CreateManualVacancyRequest {
   rawText: string;
   salaryOverride?: string;
   hhId?: string;
+  companyId?: string;
   url?: string;
-  company?: string;
 }
 
 export type UpdateManualVacancyRequest = Partial<{
   rawText: string;
   hhId: string | null;
+  companyId: string | null;
   url: string | null;
   status: ManualVacancyStatus;
   title: string;

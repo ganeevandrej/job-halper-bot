@@ -8,3 +8,13 @@ export interface VacancyFitAnalysis {
 export interface VacancyCoverLetter {
   cover_letter: string;
 }
+
+export interface CompanyProfileAnalysis {
+  name: string;
+  domain: string | null;
+  product_type: string | null;
+  short_pitch: string | null;
+  highlights: string[];
+  tech_level: string | null;
+  summary: string | null;
+}

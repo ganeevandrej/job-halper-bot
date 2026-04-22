@@ -27,6 +27,7 @@ const createManualVacanciesTableSql = (tableName: string): string => `
   CREATE TABLE IF NOT EXISTS ${tableName} (
     id TEXT PRIMARY KEY,
     hh_id TEXT,
+    company_id TEXT,
     url TEXT,
     raw_text TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'new',
@@ -55,6 +56,24 @@ const createManualVacanciesTableSql = (tableName: string): string => `
   );
 `;
 
+const createCompaniesTableSql = (): string => `
+  CREATE TABLE IF NOT EXISTS companies (
+    id TEXT PRIMARY KEY,
+    hh_id TEXT UNIQUE,
+    raw_text TEXT NOT NULL,
+    name TEXT NOT NULL,
+    domain TEXT,
+    product_type TEXT,
+    short_pitch TEXT,
+    highlights_json TEXT NOT NULL DEFAULT '[]',
+    tech_level TEXT,
+    summary TEXT,
+    structured_json TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+`;
+
 const getColumnRows = (db: Database): unknown[][] => {
   const columns = db.exec("PRAGMA table_info(manual_vacancies)");
   return columns[0]?.values ?? [];
@@ -75,7 +94,7 @@ const migrateNullableSalary = (db: Database): void => {
   db.run(createManualVacanciesTableSql("manual_vacancies_next"));
   db.run(`
     INSERT INTO manual_vacancies_next (
-      id, hh_id, url, raw_text, status, title, company, salary, estimated_salary,
+      id, hh_id, company_id, url, raw_text, status, title, company, salary, estimated_salary,
       format, formats_json, location, grade, stack_json, tasks_json, requirements_json,
       nice_to_have_json, red_flags_json, summary, match_percent, decision,
       reason, salary_estimate, cover_letter, created_at, updated_at, analyzed_at
@@ -83,6 +102,7 @@ const migrateNullableSalary = (db: Database): void => {
     SELECT
       id,
       hh_id,
+      NULL,
       url,
       raw_text,
       status,
@@ -129,6 +149,7 @@ const migrateManualVacancyStatuses = (db: Database): void => {
 
 const initSchema = (db: Database): void => {
   db.run(createManualVacanciesTableSql("manual_vacancies"));
+  db.run(createCompaniesTableSql());
 
   const columnNames = getColumnNames(db);
 
@@ -146,6 +167,10 @@ const initSchema = (db: Database): void => {
 
   if (!columnNames.has("url")) {
     db.run("ALTER TABLE manual_vacancies ADD COLUMN url TEXT");
+  }
+
+  if (!columnNames.has("company_id")) {
+    db.run("ALTER TABLE manual_vacancies ADD COLUMN company_id TEXT");
   }
 
   if (!columnNames.has("status")) {
