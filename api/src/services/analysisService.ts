@@ -4,6 +4,7 @@ import {
   getCandidateProfile,
 } from "../storage/profileRepository";
 import {
+  CompanyProfileAnalysis,
   VacancyCoverLetter,
   VacancyFitAnalysis,
 } from "../types";
@@ -57,6 +58,7 @@ const buildCoverLetterPrompt = (
   candidateResume: string,
   coverLetterInstructions: string,
   fitAnalysis: VacancyFitAnalysis,
+  companyContext: string,
 ): string => `
 Ты помогаешь frontend-разработчику написать короткое человеческое сопроводительное письмо для отклика.
 
@@ -65,6 +67,9 @@ ${candidateResume}
 
 Формат и личные правила письма:
 ${coverLetterInstructions}
+
+Контекст компании:
+${companyContext}
 
 Полный текст вакансии:
 ${rawVacancyText}
@@ -78,6 +83,9 @@ ${JSON.stringify(fitAnalysis, null, 2)}
 - Не пересказывай вакансию.
 - Не пересказывай резюме. Достаточно 1-2 самых релевантных совпадений.
 - Пиши просто и коротко.
+- Основная причина отклика должна быть связана с компанией и тем, чем она зацепила.
+- Второй акцент должен быть на задачах из вакансии, которые похожи на опыт и интересы кандидата.
+- Затем коротко подкрепи письмо 1-2 совпадениями по опыту.
 - Если технология из вакансии похожа на уже использованные инструменты кандидата, говори про близкий опыт, а не про отсутствие опыта.
 - Для Ant Design, Tailwind CSS, React Admin, Material UI, Bootstrap, shadcn/ui и похожих UI/CSS-инструментов не пиши "не использовал", если у кандидата есть опыт React, TypeScript, Material UI, сложных интерфейсов, форм, таблиц или админок.
 - В JSON-строке используй переносы строк как \\n.
@@ -87,6 +95,32 @@ ${JSON.stringify(fitAnalysis, null, 2)}
 Верни строго JSON без markdown.
 {
   "cover_letter": string
+}
+`.trim();
+
+const buildCompanyExtractionPrompt = (rawCompanyText: string): string => `
+You extract structured company data from raw company description text.
+
+Rules:
+- Return only valid JSON.
+- Preserve the language of the source text for human-readable fields.
+- Do not invent facts that are not supported by the text.
+- "highlights" must be an array with 2-6 concise points.
+- Use null for unknown scalar fields.
+- "summary" must be a short text in 2-4 sentences for a cover letter context.
+
+Raw company text:
+${rawCompanyText}
+
+Return this JSON shape:
+{
+  "name": "string",
+  "domain": "string | null",
+  "product_type": "string | null",
+  "short_pitch": "string | null",
+  "highlights": ["string"],
+  "tech_level": "string | null",
+  "summary": "string | null"
 }
 `.trim();
 
@@ -134,10 +168,73 @@ const parseCoverLetter = (content: string): VacancyCoverLetter => {
   };
 };
 
+const parseCompanyProfile = (content: string): CompanyProfileAnalysis => {
+  const parsed = JSON.parse(extractJsonObject(content)) as CompanyProfileAnalysis;
+
+  if (typeof parsed.name !== "string" || !parsed.name.trim()) {
+    throw new Error("Модель не вернула название компании");
+  }
+
+  return {
+    name: parsed.name.trim(),
+    domain:
+      typeof parsed.domain === "string" && parsed.domain.trim()
+        ? parsed.domain.trim()
+        : null,
+    product_type:
+      typeof parsed.product_type === "string" && parsed.product_type.trim()
+        ? parsed.product_type.trim()
+        : null,
+    short_pitch:
+      typeof parsed.short_pitch === "string" && parsed.short_pitch.trim()
+        ? parsed.short_pitch.trim()
+        : null,
+    highlights: Array.isArray(parsed.highlights)
+      ? parsed.highlights
+        .filter((item): item is string => typeof item === "string" && Boolean(item.trim()))
+        .map((item) => item.trim())
+      : [],
+    tech_level:
+      typeof parsed.tech_level === "string" && parsed.tech_level.trim()
+        ? parsed.tech_level.trim()
+        : null,
+    summary:
+      typeof parsed.summary === "string" && parsed.summary.trim()
+        ? parsed.summary.trim()
+        : null,
+  };
+};
+
 const ensureApiKey = (): void => {
   if (!env.groqApiKey) {
     throw new Error("Не задан GROQ_API_KEY. Без него нельзя выполнить запрос к нейросети");
   }
+};
+
+const formatCompanyContext = (
+  company: {
+    name: string;
+    domain: string | null;
+    productType: string | null;
+    shortPitch: string | null;
+    highlights: string[];
+    techLevel: string | null;
+    summary: string | null;
+  } | null,
+): string => {
+  if (!company) {
+    return "Нет отдельного профиля компании. Опирайся на вакансию и не выдумывай детали компании.";
+  }
+
+  return [
+    `Название: ${company.name}`,
+    `Домен: ${company.domain || "-"}`,
+    `Тип продукта: ${company.productType || "-"}`,
+    `Кратко: ${company.shortPitch || "-"}`,
+    `Что цепляет: ${company.highlights.length > 0 ? company.highlights.join(", ") : "-"}`,
+    `Технологический уровень: ${company.techLevel || "-"}`,
+    `Короткий обзор для письма: ${company.summary || "-"}`,
+  ].join("\n");
 };
 
 export const analyzeVacancyFit = async (
@@ -180,6 +277,15 @@ export const analyzeVacancyFit = async (
 export const generateVacancyCoverLetter = async (
   rawVacancyText: string,
   fitAnalysis: VacancyFitAnalysis,
+  company: {
+    name: string;
+    domain: string | null;
+    productType: string | null;
+    shortPitch: string | null;
+    highlights: string[];
+    techLevel: string | null;
+    summary: string | null;
+  } | null,
 ): Promise<VacancyCoverLetter> => {
   ensureApiKey();
 
@@ -201,6 +307,7 @@ export const generateVacancyCoverLetter = async (
             candidateResume,
             profile.coverLetterInstructions,
             fitAnalysis,
+            formatCompanyContext(company),
           ),
         },
       ],
@@ -216,6 +323,41 @@ export const generateVacancyCoverLetter = async (
     return parseCoverLetter(content);
   } catch (error) {
     logger.error("Vacancy cover letter generation failed", error);
+    throw error;
+  }
+};
+
+export const extractCompanyProfile = async (
+  rawCompanyText: string,
+): Promise<CompanyProfileAnalysis> => {
+  ensureApiKey();
+
+  try {
+    const completion = await client.chat.completions.create({
+      model: env.groqModel,
+      temperature: 0.1,
+      messages: [
+        {
+          role: "system",
+          content: "Return only valid JSON.",
+        },
+        {
+          role: "user",
+          content: buildCompanyExtractionPrompt(rawCompanyText),
+        },
+      ],
+      response_format: { type: "json_object" },
+    });
+
+    const content = completion.choices[0]?.message?.content?.trim();
+
+    if (!content) {
+      throw new Error("Модель вернула пустой ответ при разборе компании");
+    }
+
+    return parseCompanyProfile(content);
+  } catch (error) {
+    logger.error("Company extraction failed", error);
     throw error;
   }
 };

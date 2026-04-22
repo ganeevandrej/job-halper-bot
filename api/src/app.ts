@@ -4,6 +4,12 @@ import express, {
   Response,
 } from "express";
 import {
+  CompanyDuplicateHhIdError,
+  createCompanyFromText,
+  getCompanies,
+  getCompany,
+} from "./services/companyService";
+import {
   analyzeManualVacancyById,
   createAndAnalyzeManualVacancy,
   createManualVacancyFromText,
@@ -136,6 +142,7 @@ const parseManualVacancyUpdate = (body: unknown): UpdateManualVacancyInput => {
   const status = parseManualVacancyStatus(payload.status);
   const rawText = parseOptionalRequiredString(payload.rawText);
   const hhId = parseOptionalString(payload.hhId);
+  const companyId = parseOptionalString(payload.companyId);
   const url = parseOptionalString(payload.url);
   const title = parseOptionalRequiredString(payload.title);
   const company = parseOptionalRequiredString(payload.company);
@@ -154,6 +161,7 @@ const parseManualVacancyUpdate = (body: unknown): UpdateManualVacancyInput => {
   if (status) input.status = status;
   if (rawText !== undefined) input.rawText = rawText;
   if (hhId !== undefined) input.hhId = hhId;
+  if (companyId !== undefined) input.companyId = companyId;
   if (url !== undefined) input.url = url;
   if (title !== undefined) input.title = title;
   if (company !== undefined) input.company = company;
@@ -383,13 +391,13 @@ export const createApp = () => {
       typeof request.body?.hhId === "string"
         ? request.body.hhId.trim()
         : undefined;
+    const companyId =
+      typeof request.body?.companyId === "string"
+        ? request.body.companyId.trim()
+        : undefined;
     const url =
       typeof request.body?.url === "string"
         ? request.body.url.trim()
-        : undefined;
-    const company =
-      typeof request.body?.company === "string"
-        ? request.body.company.trim()
         : undefined;
 
     try {
@@ -398,8 +406,8 @@ export const createApp = () => {
         {
           salaryOverride: salaryOverride?.trim() || undefined,
           hhId: hhId || undefined,
+          companyId: companyId || undefined,
           url: url || undefined,
-          company: company || undefined,
         },
       );
 
@@ -434,13 +442,13 @@ export const createApp = () => {
       typeof request.body?.hhId === "string"
         ? request.body.hhId.trim()
         : undefined;
+    const companyId =
+      typeof request.body?.companyId === "string"
+        ? request.body.companyId.trim()
+        : undefined;
     const url =
       typeof request.body?.url === "string"
         ? request.body.url.trim()
-        : undefined;
-    const company =
-      typeof request.body?.company === "string"
-        ? request.body.company.trim()
         : undefined;
     try {
       const vacancy = await createAndAnalyzeManualVacancy(
@@ -448,8 +456,8 @@ export const createApp = () => {
         {
           salaryOverride: salaryOverride?.trim() || undefined,
           hhId: hhId || undefined,
+          companyId: companyId || undefined,
           url: url || undefined,
-          company: company || undefined,
         },
       );
 
@@ -521,6 +529,60 @@ export const createApp = () => {
     }
 
     response.json(vacancy);
+  });
+
+  app.get("/companies", async (_: Request, response: Response) => {
+    response.json(await getCompanies());
+  });
+
+  app.get("/companies/:id", async (request: Request, response: Response) => {
+    const companyId = getSingleValue(request.params.id);
+
+    if (!companyId) {
+      response.status(400).json({ error: "Не передан id компании" });
+      return;
+    }
+
+    const company = await getCompany(companyId);
+
+    if (!company) {
+      response.status(404).json({ error: "Компания не найдена" });
+      return;
+    }
+
+    response.json(company);
+  });
+
+  app.post("/companies", async (request: Request, response: Response) => {
+    const rawText = request.body?.rawText;
+
+    if (typeof rawText !== "string" || rawText.trim().length < 20) {
+      response.status(400).json({
+        error: "Описание компании должно быть не короче 20 символов",
+      });
+      return;
+    }
+
+    const hhId =
+      typeof request.body?.hhId === "string"
+        ? request.body.hhId.trim()
+        : undefined;
+
+    try {
+      const company = await createCompanyFromText(rawText.trim(), {
+        hhId: hhId || undefined,
+      });
+      response.status(201).json(company);
+    } catch (error) {
+      if (error instanceof CompanyDuplicateHhIdError) {
+        response.status(409).json({
+          error: `Компания с hh id ${error.hhId} уже есть в базе`,
+        });
+        return;
+      }
+
+      throw error;
+    }
   });
 
   return app;

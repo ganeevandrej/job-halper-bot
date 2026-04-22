@@ -8,6 +8,7 @@ import {
   saveManualVacancyCoverLetter,
   updateManualVacancy,
 } from "../storage/manualVacancyRepository";
+import { getCompanyById } from "../storage/companyRepository";
 import {
   ManualVacancyRecord,
   ManualVacancyStatus,
@@ -22,8 +23,8 @@ import { extractManualVacancyFields } from "./manualVacancyExtractionService";
 interface CreateManualVacancyOptions {
   salaryOverride?: string;
   hhId?: string;
+  companyId?: string;
   url?: string;
-  company?: string;
 }
 
 export class ManualVacancyDuplicateHhIdError extends Error {
@@ -50,10 +51,12 @@ export const createManualVacancyFromText = async (
 
   const now = new Date().toISOString();
   const parsed = await extractManualVacancyFields(rawText, options.salaryOverride);
-  const company = options.company?.trim() || parsed.company;
+  const linkedCompany = options.companyId ? await getCompanyById(options.companyId) : null;
+  const company = linkedCompany?.name || parsed.company;
   const record: ManualVacancyRecord = {
     id: randomUUID(),
     hhId: hhId || null,
+    companyId: linkedCompany?.id || null,
     url: options.url?.trim() || buildHhVacancyUrl(hhId),
     rawText,
     status: "new",
@@ -175,7 +178,7 @@ export const generateManualVacancyCoverLetterById = async (
     decision: vacancy.decision ?? "no",
     reason: vacancy.reason ?? "",
     salary_estimate: vacancy.salaryEstimate ?? vacancy.estimatedSalary ?? "",
-  });
+  }, vacancy.companyId ? await getCompanyById(vacancy.companyId) : null);
 
   await saveManualVacancyCoverLetter(id, coverLetter.cover_letter);
 

@@ -71,6 +71,8 @@ const mapRowToManualVacancy = (
 ): ManualVacancyRecord => ({
   id: String(row.id),
   hhId: typeof row.hh_id === "string" && row.hh_id ? row.hh_id : null,
+  companyId:
+    typeof row.company_id === "string" && row.company_id ? row.company_id : null,
   url: typeof row.url === "string" && row.url ? row.url : null,
   rawText: String(row.raw_text),
   status: mapStatus(row.status),
@@ -188,15 +190,16 @@ export const createManualVacancy = async (
   db.run(
     `
       INSERT INTO manual_vacancies (
-        id, hh_id, url, raw_text, status, title, company, salary, estimated_salary, format, formats_json,
+        id, hh_id, company_id, url, raw_text, status, title, company, salary, estimated_salary, format, formats_json,
         location, grade, stack_json, tasks_json, requirements_json, nice_to_have_json,
         red_flags_json, summary, match_percent, decision, reason,
         salary_estimate, cover_letter, created_at, updated_at, analyzed_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       vacancy.id,
       vacancy.hhId,
+      vacancy.companyId,
       vacancy.url,
       vacancy.rawText,
       vacancy.status,
@@ -279,7 +282,7 @@ export const listManualVacancies = async (
   );
   const itemsStatement = db.prepare(`
       SELECT
-      id, hh_id, url, raw_text, status, title, company, salary, estimated_salary, format, formats_json,
+      id, hh_id, company_id, url, raw_text, status, title, company, salary, estimated_salary, format, formats_json,
       location, grade, stack_json, tasks_json, requirements_json, nice_to_have_json,
       red_flags_json, summary, match_percent, decision, reason,
       salary_estimate, cover_letter, created_at, updated_at, analyzed_at
@@ -389,7 +392,7 @@ export const getManualVacancyById = async (
   const { db } = await getManualVacancyDatabase();
   const statement = db.prepare(`
       SELECT
-      id, hh_id, url, raw_text, status, title, company, salary, estimated_salary, format, formats_json,
+      id, hh_id, company_id, url, raw_text, status, title, company, salary, estimated_salary, format, formats_json,
       location, grade, stack_json, tasks_json, requirements_json, nice_to_have_json,
       red_flags_json, summary, match_percent, decision, reason,
       salary_estimate, cover_letter, created_at, updated_at, analyzed_at
@@ -433,6 +436,7 @@ export const updateManualVacancy = async (
       UPDATE manual_vacancies
       SET
         hh_id = ?,
+        company_id = ?,
         url = ?,
         raw_text = ?,
         status = ?,
@@ -455,6 +459,7 @@ export const updateManualVacancy = async (
     `,
     [
       next.hhId,
+      next.companyId,
       next.url,
       next.rawText,
       next.status,

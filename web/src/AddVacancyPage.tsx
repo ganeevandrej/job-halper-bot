@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { getCompanies } from "./companyApi";
+import { Company } from "./companyTypes";
 import { createManualVacancy } from "./manualVacancyApi";
 
 type NoticeKind = "success" | "error";
@@ -11,14 +13,38 @@ interface Notice {
 function AddVacancyPage() {
   const [rawText, setRawText] = useState("");
   const [hhId, setHhId] = useState("");
-  const [company, setCompany] = useState("");
+  const [companyHhId, setCompanyHhId] = useState("");
+  const [companies, setCompanies] = useState<Company[]>([]);
   const [saving, setSaving] = useState(false);
+  const [loadingCompanies, setLoadingCompanies] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
+
+  const selectedCompany = useMemo(
+    () =>
+      companies.find((item) => item.hhId && item.hhId === companyHhId.trim()) ?? null,
+    [companies, companyHhId],
+  );
+
+  useEffect(() => {
+    setLoadingCompanies(true);
+
+    getCompanies()
+      .then(setCompanies)
+      .catch((error) => {
+        setNotice({
+          kind: "error",
+          text: error instanceof Error
+            ? error.message
+            : "Не удалось загрузить список компаний.",
+        });
+      })
+      .finally(() => setLoadingCompanies(false));
+  }, []);
 
   const buildPayload = () => ({
     rawText: rawText.trim(),
     hhId: hhId.trim() || undefined,
-    company: company.trim() || undefined,
+    companyId: selectedCompany?.id || undefined,
   });
 
   const validate = (): boolean => {
@@ -30,13 +56,21 @@ function AddVacancyPage() {
       return false;
     }
 
+    if (!selectedCompany) {
+      setNotice({
+        kind: "error",
+        text: "Выбери компанию по hh id из списка. Если её нет, сначала добавь компанию в табе «Компания».",
+      });
+      return false;
+    }
+
     return true;
   };
 
   const resetForm = () => {
     setRawText("");
     setHhId("");
-    setCompany("");
+    setCompanyHhId("");
   };
 
   const handleAdd = async () => {
@@ -103,12 +137,29 @@ function AddVacancyPage() {
           </label>
 
           <label className="fieldGroup">
-            <span className="detailLabel">Компания</span>
+            <span className="detailLabel">hh id компании</span>
             <input
-              value={company}
-              onChange={(event) => setCompany(event.target.value)}
-              placeholder="Например: Сбер. IT"
+              list="company-hh-options"
+              value={companyHhId}
+              onChange={(event) => setCompanyHhId(event.target.value)}
+              placeholder={loadingCompanies ? "Загружаю компании..." : "Например: 123456"}
             />
+            <datalist id="company-hh-options">
+              {companies
+                .filter((item) => item.hhId)
+                .map((item) => (
+                  <option
+                    key={item.id}
+                    value={item.hhId || ""}
+                    label={`${item.name}${item.domain ? ` · ${item.domain}` : ""}`}
+                  />
+                ))}
+            </datalist>
+            <span className="detailLabel">
+              {selectedCompany
+                ? `Компания: ${selectedCompany.name}`
+                : "Если компании нет в списке, добавь её в табе «Компания»."}
+            </span>
           </label>
         </div>
 

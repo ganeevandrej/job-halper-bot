@@ -24,6 +24,7 @@ export type ManualVacancyStatus =
 export interface ManualVacancyRecord extends ManualVacancyParsedFields {
   id: string;
   hhId: string | null;
+  companyId: string | null;
   url: string | null;
   rawText: string;
   status: ManualVacancyStatus;
@@ -41,8 +42,8 @@ export interface CreateManualVacancyRequest {
   rawText: string;
   salaryOverride?: string;
   hhId?: string;
+  companyId?: string;
   url?: string;
-  company?: string;
 }
 
 export interface ManualVacancyListFilters {
@@ -56,6 +57,7 @@ export type UpdateManualVacancyInput = Partial<
   ManualVacancyParsedFields & {
     rawText: string;
     hhId: string | null;
+    companyId: string | null;
     url: string | null;
     status: ManualVacancyStatus;
   }
